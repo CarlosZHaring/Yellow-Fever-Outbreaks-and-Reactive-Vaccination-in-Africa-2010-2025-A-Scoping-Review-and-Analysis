@@ -1,0 +1,598 @@
+---
+title: "4_13_vacc_rate"
+author: "Carlos Haring"
+date: "2026-04-13"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(readr)
+library(showtext)
+
+font_add("Arial", regular = "arial.ttf")
+showtext_auto()
+```
+
+```{r}
+fig_path <- "/Users/carlosh/Documents/Documents/Yellow Fever/YF/fig"
+src_path <- "/Users/carlosh/Documents/Documents/Yellow Fever/YF/src"
+data_path <- "/Users/carlosh/Documents/Documents/Yellow Fever/YF/data"
+
+file_path <- file.path(data_path, "yellow fever reorganization.xlsx - complete_info_aggregate.csv")
+```
+
+```{r}
+df <- read_csv(file_path)
+
+# parse dates (M/D/YYYY format)
+df <- df %>%
+  mutate(
+    start_date = mdy(react.vac.start.date.one),
+    end_date   = mdy(react.vac.end.date.one)
+  ) %>%
+  filter(vacc.marker != "DRC_2014_1_pv") #because there is an aggregate estimate that works better
+```
+
+# establish vaccination types 
+```{r}
+df <- df %>%
+  mutate(
+    # split vacc.marker
+    base_marker = str_remove(vacc.marker, "_(pv|im|admin)$"),
+    type = case_when(
+      str_detect(vacc.marker, "_pv$") ~ "pv",
+      str_detect(vacc.marker, "_im$") ~ "im",
+      str_detect(vacc.marker, "_admin$") ~ "admin",
+      TRUE ~ "admin"   # treat null as admin
+    ),
+    
+    # priority: im/pv > admin
+    priority = case_when(
+      type %in% c("im", "pv") ~ 1,
+      TRUE ~ 2
+    )
+  )
+```
+
+
+# establish geography markers
+```{r}
+geo_cols <- c(
+  "react.vac.region",
+  "react.vac.counties",
+  "react.vac.province",
+  "react.vac.state",
+  "react.vac.zone",
+  "react.vac.district",
+  "react.vac.health.district",
+  "react.vac.subdistrict",
+  "react.vac.locality"
+)
+
+df <- df %>%
+  unite("geo_id", all_of(geo_cols), sep = "|", na.rm = TRUE, remove = FALSE)
+```
+
+
+# creating
+```{r}
+df_clean <- df %>%
+  mutate(
+    reac.vac.perc.one = if_else(
+      is.na(reac.vac.perc.one) & !is.na(reac.vac.one) & !is.na(reac.target.pop.one),
+      reac.vac.one / reac.target.pop.one * 100,
+      reac.vac.perc.one
+    ),
+    reac.target.pop.one = if_else(
+      is.na(reac.target.pop.one) & !is.na(reac.vac.one) & !is.na(reac.vac.perc.one),
+      (reac.vac.one / reac.vac.perc.one) * 100,
+      reac.target.pop.one
+    ),
+    reac.vac.one = if_else(
+      is.na(reac.vac.one) & !is.na(reac.target.pop.one) & !is.na(reac.vac.perc.one),
+      (reac.vac.perc.one / 100) * reac.target.pop.one,
+      reac.vac.one
+    )
+  )
+df_clean
+```
+
+#outlier removal
+```{r}
+ df_clean = df_clean %>%
+    filter(outbreak.identifier != "Uganda_2019") %>%
+  filter(outbreak.identifier != "South_Sudan_2020") %>%
+  filter(outbreak.identifier != "Cameroon_2021")
+```
+
+## creating and following priority rule
+```{r}
+df_clean <- df_clean %>%
+  mutate(
+    completeness = rowSums(!is.na(pick(
+      reac.vac.one,
+      reac.target.pop.one,
+      reac.vac.perc.one
+    )))
+  ) %>%
+  group_by(base_marker, geo_id) %>%
+  arrange(desc(completeness), priority, .by_group = TRUE) %>%
+  slice_head(n = 1) %>%
+  ungroup()
+
+df_clean
+```
+
+## mark by country and year
+```{r}
+df_clean <- df_clean %>%
+  mutate(
+    country = str_extract(base_marker, "^[^_]+"),
+    year    = as.numeric(str_extract(base_marker, "\\d{4}"))
+  )
+```
+
+
+# creating the dataframe of relevent vaccination information 
+```{r}
+campaign_df <- df_clean %>%
+  group_by(base_marker) %>%
+  summarise(
+    outbreak.identifier = first(outbreak.identifier),
+    country = first(country),
+    year = first(year),
+    start = min(start_date, na.rm = TRUE),
+    end   = max(end_date, na.rm = TRUE),
+    duration = as.numeric(end - start + 1),
+        target_pop = sum(reac.target.pop.one),
+    vaccinated_pop = sum(reac.vac.one),
+    log_estimate= -log(1-sum(vaccinated_pop)/sum(target_pop))/duration,
+    Constant_log_estimate = (1-exp(-log_estimate)),
+    n_rows = n(),
+    coverage_weighted = sum(reac.vac.one, na.rm = TRUE) /
+                        sum(reac.target.pop.one, na.rm = TRUE),
+    rate_weighted   = sum(coverage_weighted) / sum(duration),
+    coverage_unweighted = mean(reac.vac.perc.one, na.rm = TRUE)/100,
+    rate_unweighted = coverage_unweighted / duration,
+    .groups = "drop"
+  )
+campaign_df
+```
+
+## classify pre vs post angola camepiagns
+```{r}
+cutoff <- as.Date("2017-02-14")
+
+campaign_df <- campaign_df %>%
+  mutate(
+    period = if_else(start < cutoff, "pre_angola", "post_angola")
+  )
+```
+
+## pooled weighted rate
+```{r}
+pooled_weighted <- campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
+  summarise(
+    pooled_rate = sum(coverage_weighted, na.rm = TRUE) /
+                  sum(duration, na.rm = TRUE)
+  )
+pooled_weighted
+
+campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
+  dplyr::select(outbreak.identifier, country, year, start, end, coverage_weighted, rate_weighted)
+```
+##pooled weighted rates by outbreak
+```{r}
+campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
+  group_by(outbreak.identifier) %>%
+  summarise(
+    pooled_rate = sum(coverage_weighted, na.rm = TRUE) /
+                  sum(duration, na.rm = TRUE),
+    n = n()
+  )
+```
+
+## the pooled weighted variance
+```{r}
+ratio_var <- campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
+  summarise(
+    n = n(),
+    Xbar = mean(duration, na.rm = TRUE),
+    Ybar = mean(coverage_weighted, na.rm = TRUE),  
+    
+    r_hat = sum(coverage_weighted, na.rm = TRUE) / sum(duration, na.rm = TRUE),
+    
+    s2_X = var(duration, na.rm = TRUE),
+    s2_Y = var(coverage_weighted, na.rm = TRUE),
+    s_XY = cov(duration, coverage_weighted, use = "complete.obs"),
+    
+    var_ratio = (1 / (n * Xbar^2)) *
+      (r_hat^2 * s2_X + s2_Y - 2 * r_hat * s_XY),
+    
+    se_ratio = sqrt(var_ratio)
+  )
+
+ratio_var
+```
+
+## variance weighed by period
+```{r}
+tot = nrow(campaign_df %>%
+    filter(!is.na(coverage_weighted), !is.na(duration)))
+
+var_ratio_by_period_a <- campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
+  group_by(period) %>%
+  summarise(
+    n = n(),
+    perc = n()/tot *100,
+    Xbar = mean(duration),
+
+    r_hat = sum(coverage_weighted) / sum(duration),
+
+    s2_X = var(duration),
+    s2_Y = var(coverage_weighted),
+    s_XY = cov(duration, coverage_weighted),
+
+    var_ratio = (1 / (n * Xbar^2)) *
+      (r_hat^2 * s2_X + s2_Y - 2 * r_hat * s_XY),
+
+    se_ratio = sqrt(var_ratio),
+    .groups = "drop"
+  )
+var_ratio_by_period_a
+
+```
+
+
+## T test
+```{r}
+
+t_score_a=(var_ratio_by_period_a[1,5]-var_ratio_by_period_a[2,5])/sqrt(var_ratio_by_period_a[1,10]+var_ratio_by_period_a[2,10])
+(var_ratio_by_period_a[1,10]-var_ratio_by_period_a[2,10])
+sqrt(var_ratio_by_period_a[1,10]+var_ratio_by_period_a[2,10])
+t_score_a
+n = tot-2
+2 * pt(-as.numeric(t_score_a), df = n)
+```
+
+
+
+# coverage for the vaccination campeigns 
+
+##overall median
+```{r}
+campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration))%>%
+  summarise(round(median(coverage_weighted)*100,1), Q1 = round(quantile(coverage_weighted, .25)*100,1),  Q3 = round(quantile(coverage_weighted, .75)*100,1), n = n())
+```
+
+
+##min and max
+```{r}
+campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
+  group_by(base_marker) %>%
+  summarise(coverage = round((coverage_weighted)*100,1)) %>%
+  arrange(coverage)
+```
+
+##segregated median by period
+```{r}
+rows = nrow(campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration)))
+
+campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration))%>%
+  group_by(period) %>%
+  summarise( coverage = round(median(coverage_weighted)*100,2), Q1 = round(quantile(coverage_weighted, .25)*100,1),  Q3 = round(quantile(coverage_weighted, .75)*100,1), n = n(), perc = n()/rows)
+```
+
+##fishers test for these
+```{r}
+pre = (campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
+  filter(period == "pre_angola"))$coverage_weighted
+
+post = (campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
+  filter(period == "post_angola"))$coverage_weighted
+
+wilcox.test(pre,post)
+```
+
+
+# log weights 
+```{r}
+log_pooled_weighted <- campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
+  filter(coverage_weighted<1) %>%
+  summarise(
+    pooled_rate = sum(-log(1-coverage_weighted))/sum(duration)
+  )
+log_pooled_weighted
+
+campaign_df %>%
+  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
+  filter(coverage_weighted<1) %>%
+  dplyr::select(outbreak.identifier, country, year, duration, coverage_weighted, rate_weighted) %>%
+  group_by(outbreak.identifier) %>%
+  summarise(
+    pooled_rate = sum(-log(1-coverage_weighted))/sum(duration)
+  )
+```
+
+
+
+
+
+
+
+
+
+
+
+## sudan outbreak metrics
+```{r}
+campaign_df %>%
+  filter(base_marker == "SouthSudan_2024_1") %>%
+  dplyr::select(base_marker, coverage_weighted, coverage_unweighted,start, end,rate_unweighted,rate_weighted,coverage_weighted,coverage_unweighted)
+campaign_df
+```
+
+```{r}
+setwd("/Users/carlosh/Documents/Documents/Yellow Fever/YF/src")
+df = read_csv("output.csv")
+
+colnames(df)[1] = "outbreak.identifier"
+```
+
+
+
+
+# grouped by outbreak
+```{r}
+pooled_country_outbreak <- campaign_df %>%
+  group_by(base_marker) %>%
+  summarise(
+    pooled_rate_weighted = sum(coverage_weighted, na.rm = TRUE) / sum(duration, na.rm = TRUE),
+    pooled_rate_unweighted = sum(coverage_unweighted, na.rm = TRUE) / sum(duration, na.rm = TRUE),
+    n_campaigns = n(),
+    start_date = min(start, na.rm = TRUE),
+    end_date = max(end, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  filter(pooled_rate_weighted != 0)
+
+```
+
+```{r}
+
+library(tidyverse)
+library(lubridate)
+library(MMWRweek)  # for MMWRweek2Date
+library(gtsummary)
+library(flextable)
+library(summarytools)
+library(fitdistrplus)
+Theme <- function(base_size = 12, base_family = "sans") {
+  theme_minimal(base_size = base_size, base_family = base_family) +
+    theme(
+      plot.title = element_text(
+        size = base_size + 8,
+        face = "bold",
+        hjust = 0.5,
+        margin = margin(b = 8)
+      ),
+      plot.subtitle = element_text(size = base_size + 2),
+
+      axis.title = element_text(size = base_size + 6, face = "bold"),
+      axis.title.x = element_text(margin = margin(t = 8)),
+      axis.title.y = element_text(margin = margin(r = 8)),
+
+      axis.text = element_text(size = base_size),
+      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+      axis.text.y = element_text(size = base_size),
+
+      legend.position = "bottom",
+      legend.justification = "left",
+      legend.box.just = "left",
+      legend.key.width = unit(0.15, "in"),
+      legend.spacing.x = unit(0.1, "in"),
+      legend.spacing.y = unit(0.05, "in"),
+      legend.box.spacing = unit(0.1, "in"),
+      legend.margin = margin(0, 0, 0, 0),
+
+      legend.title = element_text(
+        size = base_size + 6,
+        face = "bold",
+        hjust = 0
+      ),
+      legend.text = element_text(size = base_size,
+                                margin = margin(l = 2)),
+
+      strip.text = element_text(size = base_size + 1, face = "bold"),
+      panel.grid.minor = element_blank()
+    )
+}
+```
+# histogram of pooled reactive vaccination
+```{r}
+# campaign_df$duration_group <- cut(
+#   campaign_df$duration,
+#   #breaks = c(0, 5, 10, 20 ,40 ,60, Inf),
+#   #labels = c("0–5", "6–10", "11–20", "21-40", "41–60", "61+"),
+#   include.lowest = TRUE
+# )
+
+p = ggplot(data = campaign_df, 
+       aes(x = as.Date(start), y = rate_weighted*100,
+        size = as.numeric(coverage_weighted*100))
+    ) + 
+  geom_point(
+           colour = "black",
+           linewidth = .5,
+           alpha = .9
+          ) +
+  geom_vline(
+    aes(xintercept = as.Date("2017-02-14"), colour = "End of Angola/DRC outbreak"),
+    linetype = "solid",
+    linewidth = 1
+) +
+  scale_colour_manual(
+  name = NULL,
+  values = c("End of Angola/DRC outbreak" = "red")
+) +
+#     annotate("label", 
+#            label = "End of Angola/DRC outbreak", 
+#            x = as.Date("2017-02-14"), 
+#            y = 50,
+#            h_just = 0
+#            )+
+#   annotate("label", 
+#            label = "South Sudan 
+# 2020", 
+#            x = as.Date("2020-10-23"), 
+#            y = 50,
+#            h_just = 0
+#            ) +
+   scale_x_date(
+    date_breaks = "1 year",
+    date_labels = "%Y"
+    ) +
+  xlab("Start date of Reactive Vaccination"
+  ) +
+  ylab("Target population Vaccinated per Day (%)"
+  ) +
+  scale_y_continuous(breaks = seq.default(from =0 ,to =25, by = 5)
+  ) + 
+  scale_size_continuous(
+    name = "Target Population Coverage (%)",
+    range = c(1.5, 5)
+  )+
+  labs() +
+  coord_cartesian(ylim = c(0,25)) + 
+Theme() +
+  theme(legend.position = "bottom",   axis.title.y = element_text(hjust = .9)
+)
+p
+ggsave(
+  filename = "figure_2.pdf",
+  plot = p,
+  device = cairo_pdf,
+  width = 8.5,
+  height = 5.5,
+  units = "in",
+  path = fig_path
+)
+
+ggsave(
+  filename = "figure_2.png",
+  plot = p + Theme(base_size = 32),
+  device = ragg::agg_png,
+  width = 8,
+  height = 5,
+  units = "in",
+  dpi = 300,
+  path = fig_path
+)
+median(campaign_df$duration)
+quantile(campaign_df$duration, .25)
+quantile(campaign_df$duration, .75)
+campaign_df %>%
+  group_by(period) %>%
+  summarise(median = median(duration), IQR25 = quantile(duration, .25),  IQR = quantile(duration, .75))
+campaign_df %>%
+  arrange(rate_weighted)
+```
+
+```{r}
+pub_table <- campaign_df %>%
+  arrange((start)) %>%
+  filter(!is.na(rate_weighted)) %>%
+  transmute(
+    `Start date` = start,
+    `End date` = end, # force integer -> character (no commas)
+    Country = country,
+    `Target Population` = round(target_pop,0),
+    `Coverage (%)` = round(coverage_weighted*100,2),
+    `Vaccination rate` = round(rate_weighted*100,2)
+  ) 
+
+pub_table = pub_table %>%
+  relocate(Country, .before = `Start date`)
+
+# Build display table (convert numerics to plain character, no comma formatting)
+# display_tbl <- pub_table %>%
+#   mutate(
+#     `Days: Index → Reactive Vaccination` = as.character(`Days: Index → Reactive Vaccination`),
+#     `Total Cases` = ifelse(is.na(`Total Cases`), "Unknown", as.character(as.integer(`Total Cases`))),
+#     `Total Deaths` = ifelse(is.na(`Total Deaths`), "Unknown", as.character(as.integer(`Total Deaths`))),
+#     `Confirmed Cases` = ifelse(is.na(`Confirmed Cases`), "Unknown", as.character(as.integer(`Confirmed Cases`))),
+#     `Confirmed Deaths` = ifelse(is.na(`Confirmed Deaths`), "Unknown", as.character(as.integer(`Confirmed Deaths`)))
+#   )
+
+ft_pub <- flextable(pub_table) %>%
+  theme_booktabs() %>%
+  bold(part = "header") %>%
+  align(j = 1, align = "left", part = "body") %>%
+  align(j = 2:ncol(pub_table), align = "center", part = "all") %>%
+  autofit() %>%
+  fontsize(size = 10, part = "all") %>%
+  set_header_labels(
+    Country = "Country",
+    `Start date` = "Start date",
+    `End date` = "End date", 
+    `Target Population` = "Target Population",
+    `Coverage (%)` = "Coverage (%)",
+    `Vaccination rate`  = "Vaccination rate (% per day)"
+  )
+
+# days_num_valid <- pub_table$`Days: Index → Reactive Vaccination`
+# days_num_valid <- days_num_valid[!is.na(days_num_valid)]
+# 
+# footer_txt <- sprintf(
+#   "Days: mean = %.1f; median = %.1f; mode = %s; IQR = %.1f–%.1f; range = %.1f–%.1f; n = %d complete outbreaks",
+#   mean(days_num_valid),
+#   median(days_num_valid),
+#   names(sort(table(days_num_valid), decreasing = TRUE))[1],
+#   quantile(days_num_valid, 0.25),
+#   quantile(days_num_valid, 0.75),
+#   min(days_num_valid),
+#   max(days_num_valid),
+#   length(days_num_valid)
+# )
+
+# ft_pub <- ft_pub %>%
+#   add_footer_lines(values = footer_txt) %>%
+#   align(align = "left", part = "footer")
+
+# Save outputs
+out_dir <- "~/Documents/Documents/Yellow Fever/YF/fig"
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+png_file <- file.path(out_dir, "table_3.png")
+docx_file <- file.path(out_dir, "table_3.docx")
+
+try(save_as_image(ft_pub, path = png_file, expand = 8, zoom = 2), silent = TRUE)
+try(save_as_docx(ft_pub, path = docx_file), silent = TRUE)
+
+ft_pub
+```
+
+
+
+
+
+
