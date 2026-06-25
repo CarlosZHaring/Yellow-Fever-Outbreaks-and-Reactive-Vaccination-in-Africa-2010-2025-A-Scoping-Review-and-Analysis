@@ -1,0 +1,17 @@
+Column,Information,Data type,Range
+Country,The country where the vaccination campeign took place,Character,NA
+outbreak.identifier,The country and year of the start of the yellow fever outbreak which corresponds with the outbreak.identifier column in the YF_outbreaks.csv ,Character,NA
+react.vac.start.date.one,The date of start of the first reactive vacciation campaign ,Date,"(2010-01-01, 2025-12-31)"
+react.vac.end.date.one,The date of end of the first reactive vacciation campaign ,Date,"(2010-01-01, 2025-12-31)"
+react.vac.start.date.two,The date of the start of the second reactive vaccination campaign (if applicable),Date,"(2010-01-01, 2025-12-31)"
+react.vac.end.date.two,The date of the end of the second reactive vaccination campaign (if applicable),Date,"(2010-01-01, 2025-12-31)"
+Geographic.marker.1,The name(s) of largest geographic area that idenifies where the reactive vaccination took place,"Character string, comma seperated",NA
+Geographic.marker.2,The name(s) second largest geographic area that idenifies where the reactive vaccination took place,"Character string, comma seperated",NA
+Geographic.marker.3,The name(s) third largest geographic area that idenifies where the reactive vaccination took place,"Character string, comma seperated",NA
+vacc.marker,"Country_Year_vaccination number_information type. Country denotes the country of the reactive vaccination campaign. Year denotes the year the reactive vaccination campaign started. Vaccination number indicates the overarching reactive vaccination campaign that that reactive vaccination campeign was a part of.  The information type denotes the method of which the coverage was recorded. im means independent monitoring, admin means administrative coverage, post",Character,NA
+reac.vac.one,The number of people vaccinated in the reactive vaccination campaign,integer,"(0, infinity)"
+reac.target.pop.one,The number of people making up the target population of the vaccination campaign,integer,"(0, infinity)"
+reac.vac.perc.one,The percentage of the target population for the reactive vaccination campaign that was vaccinated,number,"(0, infinity)"
+source.one,The first source used for this information (colorcoded in red),character,NA
+source.two,The first source used for this information (colorcoded in in orange),character,NA
+source.three,The first source used for this information (colorcoded in in green),character,NA
