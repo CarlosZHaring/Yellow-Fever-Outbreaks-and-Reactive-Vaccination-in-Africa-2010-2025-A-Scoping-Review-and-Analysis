@@ -1,0 +1,25 @@
+Column Name,Description,Data Type,Range
+outbreak.identifier,The country and year of the start of the yellow fever outbreak which corresponds with the outbreak.identifier column in the YF_RVCs.csv	,Character,NA
+outbreak.year,Year when the outbreak started,Numeric,(2010-2025)
+Country,The name of the country where the outbreak was recorded,Character,NA
+index.presentation,Date of presentation of the index case,Date,(1/1/2010-12/31/2025)
+index.onset,Date of onset of the index case,Date,(1/1/2010-12/31/2025)
+index.sus.conf,"if index was confirmed it is indicated, if it was not mentioned to be confirmed then it remained as suspected or probable",Character,"(suspected, probable, confirmed, NA)"
+react.vac.local.start,Date of first local reactive vaccination campaign. local reactive vaccination campeign is a reactive vaccination campeign done in the intial onset of the outbreak with vaccination that are readily available in the country. Indicated by words like small scale or local. ,Date,(1/1/2010-12/31/2025)
+react.vac.mass.start,"Date of first reactive mass vaccination campaign. A reactive vaccination campaign is not a local reactive vaccination campaign. Specifically, a reactive mass vaccionation campaign is either called a reactive mass vaccination campaign and/or organized with international partners.",Date,(1/1/2010-12/31/2025)
+tot.cases.reported,"Total cases reported during outbreak, includes the last number confirmed, suspected, and probable cases during the outbreak reporting period",Integer,"(0, infinity)"
+tot.cases.sus,Total suspected cases reported during outbreak,Integer,"(0, infinity)"
+tot.cases.confirmed,Total confirmed cases reported during outbreak,Integer,"(0, infinity)"
+tot.cases.prob,Total probable cases reported during outbreak,Integer,"(0, infinity)"
+tot.deaths.reported,"Total deaths reported during outbreak, includes the last number confirmed, probable, suspected deaths during the outbreak ",Integer,"(0, infinity)"
+tot.deaths.sus,Total suspected cases reported during outbreak,Integer,"(0, infinity)"
+tot.deaths.confirmed,Total deaths confirmed during outbreak,Integer,"(0, infinity)"
+tot.deaths.prob,Total deaths probable during outbreak,Integer,"(0, infinity)"
+first.case.confirmed,Date of first case confirmation in the outbreak,Date,(1/1/2010-12/31/2025)
+who.notif,date of the first who notification for yellow fever,Date,(1/1/2010-12/31/2025)
+outbreak.dec,Date of the outbreak declaration,Date,(1/1/2010-12/31/2025)
+source.one,Link to the first data source colorcoded in red,Character,NA
+source.two,Link to the second data source colorcoded in orange,Character,NA
+source.three,Link to the third data source colorcoded in green,Character,NA
+source.four,Link to the fourth data source colorcoded in blue,Character,NA
+source.five,Link to the fifth data source colorcoded in purple,Character,NA
