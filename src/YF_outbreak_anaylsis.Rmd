@@ -22,42 +22,34 @@ library(gtsummary)
 library(flextable)
 library(summarytools)
 library(fitdistrplus)
-
+library(webshot2)
 ```
 
 # Load
 
 ```{r}
-
-# adjust path as needed
-data <- read.csv("https://github.com/CarlosZHaring/Yellow-Fever-Outbreaks-and-Reactive-Vaccination-in-Africa-2010-2025-A-Scoping-Review-and-Analysis/blob/1abc1db03e3621203b42285708e203264740d86c/YF_outbreaks.csv",
+data <- read.csv("https://raw.githubusercontent.com/CarlosZHaring/Yellow-Fever-Outbreaks-and-Reactive-Vaccination-in-Africa-2010-2025-A-Scoping-Review-and-Analysis/refs/heads/main/data/YF_outbreaks.csv?token=GHSAT0AAAAAAEA6O6QF6HU55MJUTKNE3VC42R5RCSQ",
                  na.strings = c("", "NA", "NaN", "N/A", "null", "NULL", "z"),
                  stringsAsFactors = FALSE)
-
 ```
 
 # Cleaning and column creation
 
+## Country fixing, data column creation
 ```{r}
 
-# 1) Fix countries
+# Fix countries
 data$country[data$country == "Cote d'voire"] <- "Cote d'Ivoire"
 
-# 2) Parse known date columns (add any others you have)
+# Parse date columns
 date_cols <- c(
-"first.sus.case.date","index.presentation", "index.onset", "first.conf.case.date",
-  "last.conf.case.date","first.probable.case.date", "first.presumptive.positive.case.date", "last.susp.case.date","last.probable.case.date",
-  "react.vac.local.start","react.vac.mass.start",
-  "sus.case.reported","conf.case.reported","prob.case.reported",
-  "who.outbreak.notif","who.event.notif",
-  "sus.case.reported.who","conf.case.reported.who",
-  "outbreak.dec","first.case.conf.nonpasteur","first.case.conf.pasteur","outbreak.inv.initiated", "activated.resp.group", "who.outbreak.notif", "who.event.notif", "outbreak.dec"
+"index.presentation", "index.onset", "react.vac.local.start", "react.vac.mass.start",
+"first.case confirmed", "who.notif", "outbreak.dec"
 )
 
 date_cols <- intersect(date_cols, names(data))
 
 for (nm in date_cols) {
-  # your raw looked like m/d/Y; change format if yours differs
   data[[nm]] <- as.Date(data[[nm]], "%m/%d/%Y")
 }
 
@@ -65,35 +57,18 @@ str(data[date_cols])
 ```
 
 ## First of different events
-
 ```{r}
 # ==== First vaccination campaign (effective earliest of local/mass) ====
-
 data <- data %>%
   mutate(
     # ==== First vaccination campaign (effective earliest of local/mass) ====
-    react.vac.eff.date = pmin(react.vac.local.start, react.vac.mass.start, na.rm = TRUE),
-    # ==== First Testing  (dakar vs non) ====
-    conf.test.eff.date = pmin(first.case.conf.nonpasteur, first.case.conf.pasteur, na.rm = TRUE),
-    # ==== First WHO notification  (event vs outbreak vs sus vs conf) ====
-    who.notif.eff.date = pmin(who.outbreak.notif, sus.case.reported.who, conf.case.reported.who, na.rm = TRUE),
-    # ==== First WHO notification  (event vs outbreak vs sus vs conf) ====
-    event.report.eff.date = pmin(outbreak.dec, first.case.conf.pasteur, who.outbreak.notif, conf.case.reported.who, first.case.conf.nonpasteur, na.rm = TRUE),
-        # ==== last case date (event vs outbreak vs sus vs conf) ====
-   last.case.eff.date = pmax(last.conf.case.date, last.probable.case.date, last.susp.case.date,
-                                 na.rm = TRUE),
-        # ==== first effective case date ====
-     first.eff.case.date = pmin(first.sus.case.date, first.probable.case.date, first.conf.case.date, 
-                                 na.rm = TRUE)
-  )
-
-
+    react.vac.eff.date = pmin(react.vac.local.start, react.vac.mass.start, na.rm = TRUE))
 ```
 
 ## segeregate based on post angola and pre angola
 
 ```{r}
-#"2016-07-12" is the date of the laste confirmed case in the DRC/Angola outbreak
+#"2016-07-12" is the date of the last confirmed case in the DRC/Angola outbreak
 data = data %>%
   mutate(pre.2016.outbreak = case_when(react.vac.mass.start > "2017-02-14" ~ "Post Angola/DRC",
                                      react.vac.local.start > "2017-02-14" ~ "Post Angola/DRC",
@@ -104,8 +79,7 @@ data = data %>%
 
 
 ## Confirmed Index Cases
-This is only for index cases that were documented to be confirmed 
-based on index onset, if index onset data does not exist then index presentation is used as of 1/27/26, all data is index onset. 
+This is only for index cases that were documented to be confirmed based on index onset, if index onset data does not exist then index presentation is used instead.
 ```{r}
 data <- data %>%
   mutate(
@@ -119,7 +93,8 @@ data <- data %>%
 ```
 
 ## All Index Cases
-index cases that were either suspected or confirmed 
+
+index cases that were either suspected or confirmed or probable
 ```{r}
 data <- data %>%
   mutate(
@@ -132,488 +107,63 @@ data <- data %>%
 ```
 
 
-## Differences in weeks and days
-
+## Differences in weeks and days function
 ```{r}
-# ---- (whole weeks, rounded down) ----
-weeks_between <- function(start_date, end_date) {
-  ifelse(is.na(start_date) | is.na(end_date),
-         NA_integer_,
-         floor(as.numeric(end_date - start_date) / 7))
-}
-
+# Helper function
 days_between <- function(start_date, end_date) {
   ifelse(is.na(start_date) | is.na(end_date),
          NA_integer_,
          floor(as.numeric(end_date - start_date)))
 }
 
-# Short aliases
-sus   <- data$first.sus.case.date
-conf  <- data$first.conf.case.date
-effc  <- data$first.eff.case.date          
-who   <- data$who.notif.eff.date
-ctest <- data$conf.test.eff.date
-erep  <- data$event.report.eff.date
+# Short alias
 allind <- data$all.index.case
-confind <- data$conf.index.case 
-
-rv_l  <- data$react.vac.local.start
-rv_m  <- data$react.vac.mass.start
 rv_e  <- data$react.vac.eff.date
-data$effcase.to.effvac.week  <- weeks_between(effc, rv_e)
 
 
-last_sus  <- data$last.susp.case
-last_conf <- data$last.conf.case
-
-# =========================================================
-
-# effective case to vaccinations
-data$effcase.to.effvac.week  <- weeks_between(effc, rv_e)
-data$effcase.to.local.week   <- weeks_between(effc, rv_l)
-data$effcase.to.mass.week    <- weeks_between(effc, rv_m)
-data$effcase.to.effvac.days  <- days_between(effc, rv_e)
-data$effcase.to.mass.days    <- days_between(effc, rv_m)
-data$effcase.to.local.days    <- days_between(effc, rv_l)
-
-# first confirmed case to vaccinations
-data$confcase.to.effvac.week  <- weeks_between(conf, rv_e)
-data$confcase.to.local.week   <- weeks_between(conf, rv_l)
-data$confcase.to.mass.week    <- weeks_between(conf, rv_m)
-data$confcase.to.effvac.days  <- days_between(conf, rv_e)
-data$confcase.to.mass.days    <- days_between(conf, rv_m)
-data$confcase.to.local.days    <- days_between(conf, rv_l)
-
-#  confirmed index case to vaccinations
-data$conf.index.to.effvac.week <- weeks_between(confind, rv_e)
-data$conf.index.to.local.week <- weeks_between(confind, rv_l)
-data$conf.index.to.mass.week <- weeks_between(confind, rv_m)
-data$conf.index.to.effvac.days <- days_between(confind, rv_e)
-data$conf.index.to.local.days <- days_between(confind, rv_l)
-data$conf.index.to.mass.days <- days_between(confind, rv_m)
-
-
-#index case (sus or confirmed) to vaccinations
-data$all.index.to.effvac.week <- weeks_between(allind, rv_e)
-data$all.index.to.local.week <- weeks_between(allind, rv_l)
-data$all.index.to.mass.week <- weeks_between(allind, rv_m)
+# index case (sus or confirmed) to vaccinations
 data$all.index.to.effvac.days <- days_between(allind, rv_e)
-data$all.index.to.local.days <- days_between(allind, rv_l)
-data$all.index.to.mass.days <- days_between(allind, rv_m)
-
-# to last cases (mirroring sus/conf)
-#data$effcase.to.lastsus.week  <- weeks_between(effc, last_sus)
-#data$effcase.to.lastconf.week <- weeks_between(effc, last_conf)
-
-# sus to vaccination
-data$sus.effvac.days  <- days_between(data$sus.case.reported, rv_e)
-
-# =========================================================
-# B) WHO notification vs first cases & vaccinations
-# =========================================================
-
-# first cases → WHO notif
-data$sus.to.who.week   <- weeks_between(sus,  who)
-data$conf.to.who.week  <- weeks_between(conf, who)
-data$effcase.to.who.week <- weeks_between(effc, who)
-data$effcase.to.who.week <- weeks_between(effc, who)
-# WHO notif → vaccinations
-data$who.to.effvac.week <- weeks_between(who, rv_e)
-data$who.to.local.week  <- weeks_between(who, rv_l)
-data$who.to.mass.week   <- weeks_between(who, rv_m)
-
-
-# Outbreak declaration to vaccination 
-# =========================================================
-# C) Confirmatory testing (conf.test.eff.date) vs first cases & vaccinations
-# =========================================================
-
-# first cases → confirmatory test
-data$sus.to.ctest.week   <- weeks_between(sus,  ctest)
-data$conf.to.ctest.week  <- weeks_between(conf, ctest)
-data$effcase.to.ctest.week <- weeks_between(effc, ctest)
-
-# confirmatory test → vaccinations
-data$ctest.to.effvac.week <- weeks_between(ctest, rv_e)
-data$ctest.to.local.week  <- weeks_between(ctest, rv_l)
-data$ctest.to.mass.week   <- weeks_between(ctest, rv_m)
-
-# =========================================================
-# D) Event report (event.report.eff.date) vs first cases & vaccinations
-# =========================================================
-
-# first cases → event report
-data$sus.to.erep.week    <- weeks_between(sus,  erep)
-data$conf.to.erep.week   <- weeks_between(conf, erep)
-data$effcase.to.erep.week <- weeks_between(effc, erep)
-
-# event report → vaccinations
-data$erep.to.effvac.days <- days_between(erep, rv_e)
-data$erep.to.local.week  <- weeks_between(erep, rv_l)
-data$erep.to.mass.week   <- weeks_between(erep, rv_m)
-
 ```
 
 
-
-
-## Reactive vaccination parameter of interest 
-
+# creating mortality and time to reactive vaccination dataframes
 ```{r}
-# function
-summary_stats <- function(data, cols) {
-  data.frame(
-    variable = c("Index case to mass vaccination campaign", 
-                 "Confirmed index case to mass vaccination campaign", 
-                 "Index case to local vaccination campaign", 
-                 "Confirmed index case to local vaccination campaign",
-                 "Index case to first vaccination campaign",
-                 "Confirmed case to first vaccination campaign",
-                 "First confirmed case to mass vaccination campaign",
-                 "First confirmed case to local vaccination campaign",
-                 "First confirmed case to first vaccination campaign"),
-    
-    Median = sapply(cols, \(x) median(data[[x]], na.rm = TRUE)),
-    Q1 = sapply(cols, \(x) quantile(data[[x]], 0.25, na.rm = TRUE)),
-    Q3 = sapply(cols, \(x) quantile(data[[x]], 0.75, na.rm = TRUE)),
-    count = sapply(cols, \(x) sum(!is.na(data[[x]])))
-  )
-}
-# summary statistics 
-summary<-summary_stats(data, c("all.index.to.mass.days", "conf.index.to.mass.days", "all.index.to.local.days", "conf.index.to.local.days", "all.index.to.effvac.days", "conf.index.to.effvac.days", "confcase.to.mass.days", "confcase.to.local.days", "confcase.to.effvac.days"))
-summary
+ttv_df = data %>%
+  filter(!is.na(all.index.to.effvac.days))
 
-
+mort_df = data %>%
+  filter(!is.na(tot.cases.reported), !is.na(tot.deaths.reported))
 ```
-The 299 day max seen here is the Uganda 2019 outbreak, "delayed disbursement of funds from the government to the district slowed implementation" - EYE 2019-2020 report.
 
-removing the uganda outbreak, does not change the estimations too much
+# Time to reactive vaccination analysis
+
+## quick histogram
 ```{r}
-d1 = data %>% filter(all.index.to.mass.days	< 299)
-summary_2<-summary_stats(d1, c("all.index.to.mass.days", "conf.index.to.mass.days", "all.index.to.local.days", "conf.index.to.local.days", "all.index.to.effvac.days", "conf.index.to.effvac.days", "confcase.to.mass.days", "confcase.to.local.days", "confcase.to.effvac.days"))
-max(d1$all.index.to.mass.days)
-min(d1$all.index.to.mass.days)
-summary_2
+hist(ttv_df$all.index.to.effvac.days)
 ```
 
-
-# summary table
-
+## examine outliers 
 ```{r}
-library(flextable)
-library(webshot2)
-library(dplyr)
-
-out_dir <- "~/Documents/Documents/Yellow Fever/YF/fig"
-png_file <- file.path(out_dir, "summary_2.png")
-
-ft_summary_2 <- summary_2 %>%
-  tibble::rownames_to_column("Variable") %>%
-  flextable() %>%
-  autofit() %>%
-  theme_booktabs() %>%
-  bold(part = "header") %>%
-  align(align = "center", part = "all") %>%
-  fontsize(size = 10, part = "all") %>%
-  padding(padding = 6, part = "all") %>%
-  colformat_num(digits = 1) %>%
-  set_caption("Summary of Time Intervals (Days)")
-
-# Save directly as PNG
-save_as_image(
-  ft_summary_2,
-  path = png_file,
-  expand = 10,     # whitespace padding
-  zoom = 2         # resolution (increase to 3 if needed)
-)
-
-ft_summary_2
+ttv_df %>%
+  filter(all.index.to.effvac.days >= 200) %>%
+  dplyr::select(outbreak.identifier, outbreak.year, country, 
+                all.index.to.effvac.days)
 ```
+### South Sudan 2020 rational for exclusion
+"Implementation [of South Sudan reactive vaccination campaign] was delayed until
+October 2020 because of COVID-19" -Weekly epidemiological record, Global yellow 
+fever update, 2020.
 
+### Uganda 2019 rational for exlusion
+"The ICG supported an [Uganda] outbreak
+response targeting 1 665 402 people in August 2020,
+after delays due partly to COVID-19" -Weekly epidemiological record, Global 
+yellow fever update, 2020.
 
+### Cameroon 2021 rational for exlusion
+The epidemiological evidence between the linkage of the index case in Cameroon 
+and the vaccination campaign is to small relative to the large delay seen.
 
-```{r}
-# =========================================================
-# Create Summary Table by Pre/Post Angola Outbreak
-# =========================================================
-
-library(gtsummary)
-library(dplyr)
-library(flextable)
-library(webshot2)
-
-# Calculate additional variables needed
-data <- data %>%
-  mutate(
-    # Calculate CFRs (as percentages for display)
-    cfr_total = ifelse(tot.cases.reported > 0, 
-                      (tot.deaths.reported / tot.cases.reported) * 100, 
-                      NA_real_),
-    cfr_confirmed = ifelse(tot.cases.confirmed > 0, 
-                          (tot.deaths.confirmed / tot.cases.confirmed) * 100, 
-                          NA_real_),
-    # Calculate suspected deaths
-    tot.deaths.suspected = tot.deaths.reported - tot.deaths.confirmed
-  )
-
-# Create the summary table
-summary_table <- data %>%
-  filter(!is.na(pre.2016.outbreak)) %>%
-  dplyr::select(
-    pre.2016.outbreak,
-    country,
-    outbreak.year,
-    tot.cases.reported,
-    tot.cases.confirmed,
-    tot.deaths.reported,
-    tot.deaths.confirmed,
-    tot.deaths.suspected,
-    cfr_total,
-    cfr_confirmed,
-    all.index.to.effvac.days,
-    all.index.to.local.days,
-    all.index.to.mass.days,
-    confcase.to.effvac.days,
-    conf.index.to.effvac.days
-  ) %>%
-  tbl_summary(
-    by = pre.2016.outbreak,
-    statistic = list(
-      all_continuous() ~ "{median} ({min}, {max})",
-      all_categorical() ~ "{n} ({p}%)"
-    ),
-    digits = list(
-      all_continuous() ~ 0,
-      c(cfr_total, cfr_confirmed) ~ 1
-    ),
-    type = list(
-      country ~ "categorical",
-      outbreak.year ~ "continuous",
-      tot.cases.reported ~ "continuous",
-      tot.cases.confirmed ~ "continuous",
-      tot.deaths.reported ~ "continuous",
-      tot.deaths.confirmed ~ "continuous",
-      tot.deaths.suspected ~ "continuous",
-      cfr_total ~ "continuous",
-      cfr_confirmed ~ "continuous",
-      all.index.to.effvac.days ~ "continuous",
-      confcase.to.effvac.days ~ "continuous",
-      conf.index.to.effvac.days ~ "continuous"
-    ),
-    label = list(
-      country ~ "Country",
-      outbreak.year ~ "Outbreak Year",
-      tot.cases.reported ~ "Total Cases Reported",
-      tot.cases.confirmed ~ "Total Cases Confirmed",
-      tot.deaths.reported ~ "Total Deaths Reported",
-      tot.deaths.confirmed ~ "Total Deaths Confirmed",
-      tot.deaths.suspected ~ "Total Deaths Suspected",
-      cfr_total ~ "CFR - Total Cases (%)",
-      cfr_confirmed ~ "CFR - Confirmed Cases (%)",
-      all.index.to.effvac.days ~ "Days: Index Case → Vaccination",
-      all.index.to.local.days ~ "Days: Index Case → Local Vaccination",
-      all.index.to.mass.days~ "Days: Index Case → Mass Vaccination",
-      confcase.to.effvac.days ~ "Days: First Confirmed Case → Vaccination",
- 
-      conf.index.to.effvac.days ~ "Days: Confirmed Index Case → Vaccination"
-    ),
-    missing_text = "Unknown"
-  ) %>%
-  add_n() %>%
-  modify_header(label = "**Characteristic**") %>%
-  modify_caption("**Yellow Fever Outbreaks: Pre vs Post Angola/DRC**") %>%
-  modify_footnote(all_stat_cols() ~ "Median (Min, Max); n (%)")
-
-# Print the table
-summary_table
-
-# Convert to flextable and save
-ft <- summary_table %>%
-  as_flex_table() %>%
-  autofit() %>%
-  theme_booktabs() %>%
-  bold(part = "header") %>%
-  align(align = "center", part = "all") %>%
-  align(j = 1, align = "left", part = "body") %>%
-  fontsize(size = 10, part = "all") %>%
-  padding(padding = 6, part = "all")
-
-# Save outputs
-out_dir <- "~/Documents/Documents/Yellow Fever /YF/fig"
-
-png_file <- file.path(out_dir, "outbreak_summary_table.png")
-save_as_image(
-  ft,
-  path = png_file,
-  expand = 10,
-  zoom = 2
-)
-
-word_file <- file.path(out_dir, "outbreak_summary_table_min_max.docx")
-save_as_docx(ft, path = word_file)
-
-
-sum(data$tot.deaths.reported, na.rm = TRUE)
-sum(data$tot.cases.reported, na.rm = TRUE)
-sum(data$tot.deaths.reported, na.rm = TRUE)/sum(data$tot.cases.reported, na.rm = TRUE)
-
-sum(data$tot.deaths.reported[data$pre.2016.outbreak	 == "Post Angola/DRC"], na.rm = TRUE)
-
-sum(data$tot.cases.reported[data$pre.2016.outbreak	 == "Post Angola/DRC"], na.rm = TRUE)
-
-sum(data$tot.deaths.reported[data$pre.2016.outbreak	 == "Post Angola/DRC"], na.rm = TRUE) /
-sum(data$tot.cases.reported[data$pre.2016.outbreak	 == "Post Angola/DRC"], na.rm = TRUE)
-
-sum(data$tot.deaths.reported[data$pre.2016.outbreak	 == "Pre Angola/DRC"], na.rm = TRUE)
-
-sum(data$tot.cases.reported[data$pre.2016.outbreak	 == "Pre Angola/DRC"], na.rm = TRUE)
-
-sum(data$tot.deaths.reported[data$pre.2016.outbreak	 == "Pre Angola/DRC"], na.rm = TRUE) /
-sum(data$tot.cases.reported[data$pre.2016.outbreak	 == "Pre Angola/DRC"], na.rm = TRUE)
-
-
-```
-``` {r}
-# =========================================================
-# Summary Table by Pre/Post Angola Outbreak without outliers
-# + use Median (Q1, Q3) instead of Median (Min, Max)
-# =========================================================
-
-library(gtsummary)
-library(dplyr)
-library(flextable)
-library(webshot2)
-
-# Calculate additional variables needed
-data <- data %>%
-  mutate(
-    # Calculate CFRs (as percentages for display)
-    cfr_total = ifelse(tot.cases.reported > 0,
-                      (tot.deaths.reported / tot.cases.reported) * 100,
-                      NA_real_),
-    cfr_confirmed = ifelse(tot.cases.confirmed > 0,
-                          (tot.deaths.confirmed / tot.cases.confirmed) * 100,
-                          NA_real_),
-    # Calculate suspected deaths
-    tot.deaths.suspected = tot.deaths.reported - tot.deaths.confirmed
-  )
-
-# Create the summary table
-summary_table <- data %>%
-  filter(!is.na(pre.2016.outbreak)) %>%
-  dplyr::select(
-    pre.2016.outbreak,
-    country,
-    outbreak.year,
-    tot.cases.reported,
-    tot.cases.confirmed,
-    tot.deaths.reported,
-    tot.deaths.confirmed,
-    tot.deaths.suspected,
-    cfr_total,
-    cfr_confirmed,
-    all.index.to.effvac.days,
-    all.index.to.local.days,
-    all.index.to.mass.days,
-    confcase.to.effvac.days,
-    conf.index.to.effvac.days
-  ) %>%
-  tbl_summary(
-    by = pre.2016.outbreak,
-    statistic = list(
-      all_continuous() ~ "{median} ({p25}, {p75})",
-      all_categorical() ~ "{n} ({p}%)"
-    ),
-    digits = list(
-      all_continuous() ~ 0,
-      c(cfr_total, cfr_confirmed) ~ 1
-    ),
-    type = list(
-      country ~ "categorical",
-      outbreak.year ~ "continuous",
-      tot.cases.reported ~ "continuous",
-      tot.cases.confirmed ~ "continuous",
-      tot.deaths.reported ~ "continuous",
-      tot.deaths.confirmed ~ "continuous",
-      tot.deaths.suspected ~ "continuous",
-      cfr_total ~ "continuous",
-      cfr_confirmed ~ "continuous",
-      all.index.to.effvac.days ~ "continuous",
-      all.index.to.local.days ~ "continuous",
-      all.index.to.mass.days ~ "continuous",
-      confcase.to.effvac.days ~ "continuous",
-      conf.index.to.effvac.days ~ "continuous"
-    ),
-    label = list(
-      country ~ "Country",
-      outbreak.year ~ "Outbreak Year",
-      tot.cases.reported ~ "Total Cases Reported",
-      tot.cases.confirmed ~ "Total Cases Confirmed",
-      tot.deaths.reported ~ "Total Deaths Reported",
-      tot.deaths.confirmed ~ "Total Deaths Confirmed",
-      tot.deaths.suspected ~ "Total Deaths Suspected",
-      cfr_total ~ "CFR - Total Cases (%)",
-      cfr_confirmed ~ "CFR - Confirmed Cases (%)",
-      all.index.to.effvac.days ~ "Days: Index Case → Vaccination",
-      all.index.to.local.days ~ "Days: Index Case → Local Vaccination",
-      all.index.to.mass.days ~ "Days: Index Case → Mass Vaccination",
-      confcase.to.effvac.days ~ "Days: First Confirmed Case → Vaccination",
-      conf.index.to.effvac.days ~ "Days: Confirmed Index Case → Vaccination"
-    ),
-    missing_text = "Unknown"
-  ) %>%
-  add_n() %>%
-  modify_header(label = "**Characteristic**") %>%
-  modify_caption("**Yellow Fever Outbreaks: Pre vs Post Angola/DRC**") %>%
-  modify_footnote(all_stat_cols() ~ "Median (Q1, Q3); n (%)")
-
-# Print the table
-summary_table
-
-# Convert to flextable and save
-ft <- summary_table %>%
-  as_flex_table() %>%
-  autofit() %>%
-  theme_booktabs() %>%
-  bold(part = "header") %>%
-  align(align = "center", part = "all") %>%
-  align(j = 1, align = "left", part = "body") %>%
-  fontsize(size = 10, part = "all") %>%
-  padding(padding = 6, part = "all")
-
-# Save outputs
-out_dir <- "~/Documents/Documents/Yellow Fever/YF/fig"
-
-png_file <- file.path(out_dir, "outbreak_summary_table.png")
-save_as_image(
-  ft,
-  path = png_file,
-  expand = 10,
-  zoom = 2
-)
-
-word_file <- file.path(out_dir, "outbreak_summary_table_outliers_q1_q3.docx")
-save_as_docx(ft, path = word_file)
-
-
-# --- Your totals (unchanged) ---
-sum(data$tot.deaths.reported, na.rm = TRUE)
-sum(data$tot.cases.reported, na.rm = TRUE)
-sum(data$tot.deaths.reported, na.rm = TRUE)/sum(data$tot.cases.reported, na.rm = TRUE)
-
-sum(data$tot.deaths.reported[data$pre.2016.outbreak == "Post Angola/DRC"], na.rm = TRUE)
-sum(data$tot.cases.reported[data$pre.2016.outbreak == "Post Angola/DRC"], na.rm = TRUE)
-sum(data$tot.deaths.reported[data$pre.2016.outbreak == "Post Angola/DRC"], na.rm = TRUE) /
-  sum(data$tot.cases.reported[data$pre.2016.outbreak == "Post Angola/DRC"], na.rm = TRUE)
-
-sum(data$tot.deaths.reported[data$pre.2016.outbreak == "Pre Angola/DRC"], na.rm = TRUE)
-sum(data$tot.cases.reported[data$pre.2016.outbreak == "Pre Angola/DRC"], na.rm = TRUE)
-sum(data$tot.deaths.reported[data$pre.2016.outbreak == "Pre Angola/DRC"], na.rm = TRUE) /
-  sum(data$tot.cases.reported[data$pre.2016.outbreak == "Pre Angola/DRC"], na.rm = TRUE)
-data%>%
-  filter(is.na(pre.2016.outbreak))
-```
 
 #outlier removal
 ```{r}
