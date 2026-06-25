@@ -28,7 +28,7 @@ library(webshot2)
 # Load
 
 ```{r}
-data <- read.csv("https://raw.githubusercontent.com/CarlosZHaring/Yellow-Fever-Outbreaks-and-Reactive-Vaccination-in-Africa-2010-2025-A-Scoping-Review-and-Analysis/refs/heads/main/data/YF_outbreaks.csv?token=GHSAT0AAAAAAEA6O6QF6HU55MJUTKNE3VC42R5RCSQ",
+data <- read.csv("https://raw.githubusercontent.com/CarlosZHaring/Yellow-Fever-Outbreaks-and-Reactive-Vaccination-in-Africa-2010-2025-A-Scoping-Review-and-Analysis/refs/heads/main/data/YF_outbreaks.csv?token=GHSAT0AAAAAAEA6O6QEDQQJRTJG3AD6SYWO2R5S62A",
                  na.strings = c("", "NA", "NaN", "N/A", "null", "NULL", "z"),
                  stringsAsFactors = FALSE)
 ```
@@ -167,302 +167,33 @@ and the vaccination campaign is to small relative to the large delay seen.
 
 #outlier removal
 ```{r}
- data = data %>%
-    filter(outbreak.indicator != "Uganda_2019") %>%
-  filter(outbreak.indicator != "South_Sudan_2020") %>%
-  filter(outbreak.indicator != "Cameroon_2021")
+ ttv_df = ttv_df %>%
+    filter(outbreak.identifier != "Uganda_2019") %>%
+  filter(outbreak.identifier != "South_Sudan_2020") %>%
+  filter(outbreak.identifier != "Cameroon_2021")
 ```
 
-``` {r}
-# =========================================================
-# Summary Table by Pre/Post Angola Outbreak without outliers
-# + use Median (Q1, Q3) instead of Median (Min, Max)
-# =========================================================
 
-library(gtsummary)
-library(dplyr)
-library(flextable)
-library(webshot2)
-
-# Calculate additional variables needed
-data <- data %>%
-  mutate(
-    # Calculate CFRs (as percentages for display)
-    cfr_total = ifelse(tot.cases.reported > 0,
-                      (tot.deaths.reported / tot.cases.reported) * 100,
-                      NA_real_),
-    cfr_confirmed = ifelse(tot.cases.confirmed > 0,
-                          (tot.deaths.confirmed / tot.cases.confirmed) * 100,
-                          NA_real_),
-    # Calculate suspected deaths
-    tot.deaths.suspected = tot.deaths.reported - tot.deaths.confirmed
-  )
-
-# Create the summary table
-summary_table <- data %>%
-  filter(!is.na(pre.2016.outbreak)) %>%
-  dplyr::select(
-    pre.2016.outbreak,
-    country,
-    outbreak.year,
-    tot.cases.reported,
-    tot.cases.confirmed,
-    tot.deaths.reported,
-    tot.deaths.confirmed,
-    tot.deaths.suspected,
-    cfr_total,
-    cfr_confirmed,
-    all.index.to.effvac.days,
-    all.index.to.local.days,
-    all.index.to.mass.days,
-    confcase.to.effvac.days,
-    conf.index.to.effvac.days
-  ) %>%
-  # ---- EXCLUDE day-values > 299 (set to NA so they are not summarized) ----
-  mutate(across(
-    c(all.index.to.effvac.days,
-      all.index.to.local.days,
-      all.index.to.mass.days,
-      confcase.to.effvac.days,
-      conf.index.to.effvac.days),
-    ~ ifelse(. > 299, NA_real_, .)
-  )) %>%
-  tbl_summary(
-    by = pre.2016.outbreak,
-    statistic = list(
-      all_continuous() ~ "{median} ({p25}, {p75})",
-      all_categorical() ~ "{n} ({p}%)"
-    ),
-    digits = list(
-      all_continuous() ~ 0,
-      c(cfr_total, cfr_confirmed) ~ 1
-    ),
-    type = list(
-      country ~ "categorical",
-      outbreak.year ~ "continuous",
-      tot.cases.reported ~ "continuous",
-      tot.cases.confirmed ~ "continuous",
-      tot.deaths.reported ~ "continuous",
-      tot.deaths.confirmed ~ "continuous",
-      tot.deaths.suspected ~ "continuous",
-      cfr_total ~ "continuous",
-      cfr_confirmed ~ "continuous",
-      all.index.to.effvac.days ~ "continuous",
-      all.index.to.local.days ~ "continuous",
-      all.index.to.mass.days ~ "continuous",
-      confcase.to.effvac.days ~ "continuous",
-      conf.index.to.effvac.days ~ "continuous"
-    ),
-    label = list(
-      country ~ "Country",
-      outbreak.year ~ "Outbreak Year",
-      tot.cases.reported ~ "Total Cases Reported",
-      tot.cases.confirmed ~ "Total Cases Confirmed",
-      tot.deaths.reported ~ "Total Deaths Reported",
-      tot.deaths.confirmed ~ "Total Deaths Confirmed",
-      tot.deaths.suspected ~ "Total Deaths Suspected",
-      cfr_total ~ "CFR - Total Cases (%)",
-      cfr_confirmed ~ "CFR - Confirmed Cases (%)",
-      all.index.to.effvac.days ~ "Days: Index Case → Vaccination",
-      all.index.to.local.days ~ "Days: Index Case → Local Vaccination",
-      all.index.to.mass.days ~ "Days: Index Case → Mass Vaccination",
-      confcase.to.effvac.days ~ "Days: First Confirmed Case → Vaccination",
-      conf.index.to.effvac.days ~ "Days: Confirmed Index Case → Vaccination"
-    ),
-    missing_text = "Unknown"
-  ) %>%
-  add_n() %>%
-  modify_header(label = "**Characteristic**") %>%
-  modify_caption("**Yellow Fever Outbreaks: Pre vs Post Angola/DRC**") %>%
-  modify_footnote(all_stat_cols() ~ "Median (Q1, Q3); n (%)")
-
-# Print the table
-summary_table
-
-# Convert to flextable and save
-ft <- summary_table %>%
-  as_flex_table() %>%
-  autofit() %>%
-  theme_booktabs() %>%
-  bold(part = "header") %>%
-  align(align = "center", part = "all") %>%
-  align(j = 1, align = "left", part = "body") %>%
-  fontsize(size = 10, part = "all") %>%
-  padding(padding = 6, part = "all")
-
-# Save outputs
-out_dir <- "~/Documents/Documents/Yellow Fever/YF/fig"
-
-png_file <- file.path(out_dir, "outbreak_summary_table.png")
-save_as_image(
-  ft,
-  path = png_file,
-  expand = 10,
-  zoom = 2
-)
-
-word_file <- file.path(out_dir, "outbreak_summary_table_no_outliers.docx")
-save_as_docx(ft, path = word_file)
-```
-
+##Table 1, table of reactive vaccination campaigns 
 ```{r}
-# =========================================================
-# Create Summary Table 
-# =========================================================
-
-library(gtsummary)
-library(dplyr)
-library(flextable)
-library(webshot2)
-
-# Calculate additional variables needed
-data <- data %>%
-  mutate(
-    # Calculate CFRs (as percentages for display)
-    cfr_total = ifelse(tot.cases.reported > 0, 
-                      (tot.deaths.reported / tot.cases.reported) * 100, 
-                      NA_real_),
-    cfr_confirmed = ifelse(tot.cases.confirmed > 0, 
-                          (tot.deaths.confirmed / tot.cases.confirmed) * 100, 
-                          NA_real_),
-    # Calculate suspected deaths
-    tot.deaths.suspected = tot.deaths.reported - tot.deaths.confirmed
-  )
-
-# Create the summary table
-summary_table <- data %>%
-  filter(!is.na(pre.2016.outbreak)) %>%
-  dplyr::select(
-    pre.2016.outbreak,
-    country,
-    outbreak.year,
-    tot.cases.reported,
-    tot.cases.confirmed,
-    tot.deaths.reported,
-    tot.deaths.confirmed,
-    tot.deaths.suspected,
-    cfr_total,
-    cfr_confirmed,
-    all.index.to.effvac.days,
-    confcase.to.effvac.days,
-    conf.index.to.effvac.days
-  ) %>%
-  tbl_summary(
-    statistic = list(
-      all_continuous() ~ "{median} ({min}, {max})",
-      all_categorical() ~ "{n} ({p}%)"
-    ),
-    digits = list(
-      all_continuous() ~ 0,
-      c(cfr_total, cfr_confirmed) ~ 1
-    ),
-    type = list(
-      country ~ "categorical",
-      outbreak.year ~ "continuous",
-      tot.cases.reported ~ "continuous",
-      tot.cases.confirmed ~ "continuous",
-      tot.deaths.reported ~ "continuous",
-      tot.deaths.confirmed ~ "continuous",
-      tot.deaths.suspected ~ "continuous",
-      cfr_total ~ "continuous",
-      cfr_confirmed ~ "continuous",
-      all.index.to.effvac.days ~ "continuous",
-      confcase.to.effvac.days ~ "continuous",
-      conf.index.to.effvac.days ~ "continuous"
-    ),
-    label = list(
-      country ~ "Country",
-      outbreak.year ~ "Outbreak Year",
-      tot.cases.reported ~ "Total Cases Reported",
-      tot.cases.confirmed ~ "Total Cases Confirmed",
-      tot.deaths.reported ~ "Total Deaths Reported",
-      tot.deaths.confirmed ~ "Total Deaths Confirmed",
-      tot.deaths.suspected ~ "Total Deaths Suspected",
-      cfr_total ~ "CFR - Total Cases (%)",
-      cfr_confirmed ~ "CFR - Confirmed Cases (%)",
-      all.index.to.effvac.days ~ "Days: Index Case → Vaccination",
-      confcase.to.effvac.days ~ "Days: First Confirmed Case → Vaccination",
-      conf.index.to.effvac.days ~ "Days: Confirmed Index Case → Vaccination"
-    ),
-    missing_text = "Unknown"
-  ) %>%
-  add_n() %>%
-  modify_header(label = "**Characteristic**") %>%
-  modify_caption("**Yellow Fever Outbreaks: Pre vs Post Angola/DRC**") %>%
-  modify_footnote(all_stat_cols() ~ "Median (Min, Max); n (%)")
-
-# Print the table
-summary_table
-
-# Convert to flextable and save
-ft <- summary_table %>%
-  as_flex_table() %>%
-  autofit() %>%
-  theme_booktabs() %>%
-  bold(part = "header") %>%
-  align(align = "center", part = "all") %>%
-  align(j = 1, align = "left", part = "body") %>%
-  fontsize(size = 10, part = "all") %>%
-  padding(padding = 6, part = "all")
-
-# Save outputs
-out_dir <- "~/Documents/Documents/Yellow Fever/YF/fig"
-
-png_file <- file.path(out_dir, "outbreak_summary_table.png")
-save_as_image(
-  ft,
-  path = png_file,
-  expand = 10,
-  zoom = 2
-)
-
-word_file <- file.path(out_dir, "outbreak_summary_table_not_divided_min_max.docx")
-save_as_docx(ft, path = word_file)
-```
-
-
-
-
-
-
-
-
-
-# reactive vaccination from index case
-
-
-```{r}
-library(dplyr)
-library(flextable)
-library(webshot2)
-library(officer)
-
-data$all.index.to.effvac.days
 # Filter to rows with non-missing days-to-mass and year
-pub_table <- data %>%
+pub_table <- ttv_df %>%
   arrange((all.index.case)) %>%
-  filter(!is.na(all.index.to.effvac.days), !is.na(outbreak.year)) %>%
   transmute(
     Year = as.character(as.integer(outbreak.year)),     # force integer -> character (no commas)
     Country = country,
     `Days: Index → Reactive Vaccination` = all.index.to.effvac.days,
     `Total Cases` = tot.cases.reported,
     `Total Deaths` = tot.deaths.reported,
-    `Confirmed Cases` = tot.cases.confirmed,
-    `Confirmed Deaths` = tot.deaths.confirmed,
-    CFR = tot.deaths.reported /  tot.cases.reported
+    CFR = tot.deaths.reported / tot.cases.reported
   ) 
-pub_table$CFR
-
 # Build display table (convert numerics to plain character, no comma formatting)
 display_tbl <- pub_table %>%
   mutate(
     `Days: Index → Reactive Vaccination` = as.character(`Days: Index → Reactive Vaccination`),
     `Total Cases` = ifelse(is.na(`Total Cases`), "Unknown", as.character(as.integer(`Total Cases`))),
     `Total Deaths` = ifelse(is.na(`Total Deaths`), "Unknown", as.character(as.integer(`Total Deaths`))),
-    `Confirmed Cases` = ifelse(is.na(`Confirmed Cases`), "Unknown", as.character(as.integer(`Confirmed Cases`))),
-    `Confirmed Deaths` = ifelse(is.na(`Confirmed Deaths`), "Unknown", as.character(as.integer(`Confirmed Deaths`))),
-    `CFR` = ifelse(is.na(`Total Deaths`), "Unknown", as.character(round(CFR,2)))
+    `CFR` = ifelse(is.na(CFR), "Unknown", as.character(round(CFR,2)))
   )
 
 ft_pub <- flextable(display_tbl) %>%
