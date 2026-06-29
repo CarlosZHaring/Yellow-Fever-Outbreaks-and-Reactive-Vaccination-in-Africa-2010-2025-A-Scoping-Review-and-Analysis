@@ -23,12 +23,13 @@ library(flextable)
 library(summarytools)
 library(fitdistrplus)
 library(webshot2)
+library(coin)
 ```
 
 # Load
 
 ```{r}
-data <- read.csv("https://raw.githubusercontent.com/CarlosZHaring/Yellow-Fever-Outbreaks-and-Reactive-Vaccination-in-Africa-2010-2025-A-Scoping-Review-and-Analysis/refs/heads/main/data/YF_outbreaks.csv?token=GHSAT0AAAAAAEA6O6QEDQQJRTJG3AD6SYWO2R5S62A",
+data <- read.csv("https://raw.githubusercontent.com/CarlosZHaring/Yellow-Fever-Outbreaks-and-Reactive-Vaccination-in-Africa-2010-2025-A-Scoping-Review-and-Analysis/refs/heads/main/data/YF_outbreaks.csv?token=GHSAT0AAAAAAEA6O6QEPLZSMFGN36D4ISLW2SDAB2A",
                  na.strings = c("", "NA", "NaN", "N/A", "null", "NULL", "z"),
                  stringsAsFactors = FALSE)
 ```
@@ -165,7 +166,7 @@ The epidemiological evidence between the linkage of the index case in Cameroon
 and the vaccination campaign is to small relative to the large delay seen.
 
 
-#outlier removal
+## outlier removal
 ```{r}
  ttv_df = ttv_df %>%
     filter(outbreak.identifier != "Uganda_2019") %>%
@@ -173,8 +174,14 @@ and the vaccination campaign is to small relative to the large delay seen.
   filter(outbreak.identifier != "Cameroon_2021")
 ```
 
+## percentage and number pre and post angola campaign
+```{r}
+ttv_df %>%
+  group_by(pre.2016.outbreak) %>%
+  summarise(n= n(), per = n()/nrow(pub_table) * 100)
+```
 
-##Table 1, table of reactive vaccination campaigns 
+## Table 1, table of reactive vaccination campaigns 
 ```{r}
 # Filter to rows with non-missing days-to-mass and year
 pub_table <- ttv_df %>%
@@ -213,7 +220,6 @@ ft_pub <- flextable(display_tbl) %>%
     `Confirmed Deaths` = "Confirmed Deaths",
     `CFR` = "CFR"
   )
-pub_table$`Days: Index → Reactive Vaccination`
 
 days_num_valid <- pub_table$`Days: Index → Reactive Vaccination`
 days_num_valid <- days_num_valid[!is.na(days_num_valid)]
@@ -235,10 +241,10 @@ ft_pub <- ft_pub %>%
   align(align = "left", part = "footer")
 
 # Save outputs
-out_dir <- "~/Documents/Documents/Yellow Fever/YF/fig"
+out_dir <- "~/Documents/Documents/Yellow Fever/YF_scoping_review/fig"
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-png_file <- file.path(out_dir, "table_1_no234_all.png")
-docx_file <- file.path(out_dir, "table_1_no234_all.docx")
+png_file <- file.path(out_dir, "table_1.png")
+docx_file <- file.path(out_dir, "table_1.docx")
 
 try(save_as_image(ft_pub, path = png_file, expand = 8, zoom = 2), silent = TRUE)
 try(save_as_docx(ft_pub, path = docx_file), silent = TRUE)
@@ -248,154 +254,39 @@ ft_pub
 
 ```
 
-
+## wilcoxon test
 ```{r}
-pub_table <- data %>%
-  filter(!is.na(all.index.to.effvac.days), !is.na(outbreak.year))
-
-pub_table %>%
-  group_by(pre.2016.outbreak) %>%
-  summarise(n= n(), per = n()/nrow(pub_table) * 100)
+coin::wilcox_test(data = ttv_df, all.index.to.effvac.days ~ as.factor(pre.2016.outbreak), distribution = "exact") # use this for ties
+```
+## summary table pre and post angola
+```{r}
+ttv_df %>%
+  group_by(as.factor(pre.2016.outbreak)) %>%
+    summarise(
+            lower_bound=quantile(all.index.to.effvac.days, .25),
+upper_bound=quantile(all.index.to.effvac.days, .75),
+median = median(all.index.to.effvac.days))
 ```
 
-##wilcoxon test
+## smallest and largest delays 
 
+### minimum
 ```{r}
-coin::wilcox_test(data = data, all.index.to.effvac.days ~ as.factor(pre.2016.outbreak), distribution = "exact") # use this for ties
-all_a <- data %>%
-    filter(!is.na(all.index.to.effvac.days), !is.na(outbreak.year)) %>%
-  filter(pre.2016.outbreak == "Post Angola/DRC")
-
-all_b <- data %>%
-    filter(!is.na(all.index.to.effvac.days), !is.na(outbreak.year)) %>%
-  filter(pre.2016.outbreak == "Pre Angola/DRC")
-
-wilcox.test(all_a$all.index.to.mass.days, all_b$all.index.to.mass.days)
-```
-
-# CFR and death anaylsis 
-```{r}
-row = nrow(data %>%
-  filter(!is.na(tot.cases.reported)) %>%
-  filter(!is.na(tot.deaths.reported)))
-data %>%
-  filter(!is.na(tot.cases.reported)) %>%
-  filter(!is.na(tot.deaths.reported)) %>%
-  group_by(pre.2016.outbreak) %>%
-  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported), n = n(),perc = round(n/row*100,1))
-
-data %>%
-  filter(!is.na(tot.cases.reported)) %>%
-  filter(!is.na(tot.deaths.reported)) %>%
-  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported), n = n())
-```
-
-```{r}
-data %>%
-  filter(!is.na(tot.cases.reported)) %>%
-  filter(!is.na(tot.deaths.reported)) %>%
-  group_by(pre.2016.outbreak) %>%
-  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported), n = n(),
-            average_cases = mean(tot.cases.reported),
-            lower_bound=quantile(tot.cases.reported, .25),
-upper_bound=quantile(tot.cases.reported, .75),
-median = median(tot.cases.reported))
-
-data %>%
-  filter(!is.na(tot.cases.reported)) %>%
-  filter(!is.na(tot.deaths.reported)) %>%
-  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported), n = n(),
-            average_cases = mean(tot.cases.reported),
-            lower_bound=quantile(tot.cases.reported, .25),
-upper_bound=quantile(tot.cases.reported, .75),
-median = median(tot.cases.reported))
-```
-
-
-### wilcoxon of median reported cases
-```{r}
-library(coin)
-all_a <- data %>%
-  filter(!is.na(tot.cases.reported)) %>%
-  filter(!is.na(tot.deaths.reported))
-
-all_a$pre.2016.outbreak = as.factor(all_a$pre.2016.outbreak)
-
-wilcox_test(tot.cases.reported ~ pre.2016.outbreak, data = all_a,
-            distribution = "exact")
-```
-
-
-```{r}
-f1=data %>%
- filter(!is.na(tot.cases.reported)) %>%
- filter(!is.na(tot.deaths.reported))
+ttv_df %>%
+  arrange(all.index.to.effvac.days) %>%
+   dplyr::select(outbreak.identifier, all.index.to.effvac.days) %>%
+  filter(all.index.to.effvac.days == min(all.index.to.effvac.days))
 
 ```
 
+### maximum
 ```{r}
-tot = nrow(data %>%
-    filter(!is.na(tot.cases.reported), !is.na(tot.deaths.reported)))
-
-var_ratio_by_period <- data %>%
-  filter(!is.na(tot.cases.reported), !is.na(tot.deaths.reported)) %>%
-  summarise(
-    n = n(),
-    perc = n()/tot *100,
-    Xbar = mean(tot.cases.reported),
-
-    r_hat = sum(tot.deaths.reported) / sum(tot.cases.reported),
-
-    s2_X = var(tot.cases.reported),
-    s2_Y = var(tot.deaths.reported),
-    s_XY = cov(tot.deaths.reported, tot.cases.reported),
-
-    var_ratio = (1 / (n * Xbar^2)) *
-      (r_hat^2 * s2_X + s2_Y - 2 * r_hat * s_XY),
-
-    se_ratio = sqrt(var_ratio),
-  )
-var_ratio_by_period
+ttv_df %>%
+  arrange(all.index.to.effvac.days) %>%
+   dplyr::select(outbreak.identifier, all.index.to.effvac.days) %>%
+  filter(all.index.to.effvac.days == max(all.index.to.effvac.days))
 ```
-
-```{r}
-tot = nrow(data %>%
-    filter(!is.na(tot.cases.reported), !is.na(tot.deaths.reported)))
-
-var_ratio_by_period <- data %>%
-  filter(!is.na(tot.cases.reported), !is.na(tot.deaths.reported)) %>%
-  group_by(pre.2016.outbreak) %>%
-  summarise(
-    n = n(),
-    perc = n()/tot *100,
-    Xbar = mean(tot.cases.reported),
-
-    r_hat = sum(tot.deaths.reported) / sum(tot.cases.reported),
-
-    s2_X = var(tot.cases.reported),
-    s2_Y = var(tot.deaths.reported),
-    s_XY = cov(tot.deaths.reported, tot.cases.reported),
-
-    var_ratio = (1 / (n * Xbar^2)) *
-      (r_hat^2 * s2_X + s2_Y - 2 * r_hat * s_XY),
-
-    se_ratio = sqrt(var_ratio),
-  )
-var_ratio_by_period
-```
-
-```{r}
-
-t_score=(var_ratio_by_period[1,5]-var_ratio_by_period[2,5])/sqrt(var_ratio_by_period[1,10]+var_ratio_by_period[2,10])
-t_score
-n = var_ratio_by_period[1,2 ]+ var_ratio_by_period[2,2]-2
-
-2 * pt(-abs(as.numeric(t_score)), df = as.numeric(n))
-```
-
-
-# plots
-
+## Theme for figure 1 plot
 ```{r}
 Theme = function(base_size = 12, base_family = "sans") {
   theme_minimal(base_size = base_size, base_family = base_family) +
@@ -429,15 +320,10 @@ Theme = function(base_size = 12, base_family = "sans") {
 }
 ```
 
-# histogram of delay
-```{r}
-data$tot.cases.reported
-data_1 = data %>%
-    filter(outbreak.indicator != "Uganda_2019") %>%
-  filter(outbreak.indicator != "South_Sudan_2020") %>%
-  filter(outbreak.indicator != "Cameroon_2024")
 
-ggplot(data = data_1[data_1$all.index.to.effvac.days < 234,], 
+## Figure 1: Delay of reactive vaccinations
+```{r}
+ggplot(data = ttv_df, 
        aes(x = as.Date(all.index.case), y = all.index.to.effvac.days)
        ) + 
   geom_point(width = 75, 
@@ -493,7 +379,7 @@ ggsave(
   width = 8.5,
   height = 5.5,
   units = "in",
-  path = fig_path
+  path = out_dir
 )
 
 ggsave(
@@ -504,10 +390,121 @@ ggsave(
   height = 5.5,
   units = "in",
   dpi = 300,
-  path = fig_path
+  path = out_dir
 )
 ```
 
+
+# CFR and death anaylsis 
+
+### row count, basic summary by period and overall of CFR
+```{r}
+row_count= nrow(mort_df)
+mort_df %>%
+  group_by(pre.2016.outbreak) %>%
+  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported), n = n(), perc = round(n/row_count*100,1))
+
+mort_df %>%
+  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported), n = n())
+```
+
+
+## variance and SE calculation for CFR
+```{r}
+row_count = nrow(mort_df)
+
+var_ratio_by_period <- mort_df %>%
+  filter(!is.na(tot.cases.reported), !is.na(tot.deaths.reported)) %>%
+  group_by(pre.2016.outbreak) %>%
+  summarise(
+    n = n(),
+    perc = n/row_count *100,
+    Xbar = mean(tot.cases.reported),
+
+    r_hat = sum(tot.deaths.reported) / sum(tot.cases.reported),
+
+    s2_X = var(tot.cases.reported),
+    s2_Y = var(tot.deaths.reported),
+    s_XY = cov(tot.deaths.reported, tot.cases.reported),
+
+    var_ratio = (1 / (n * Xbar^2)) *
+      (r_hat^2 * s2_X + s2_Y - 2 * r_hat * s_XY),
+
+    se_ratio = sqrt(var_ratio),
+  )
+var_ratio_by_period
+```
+
+## Welch's T-test for CFR
+```{r}
+
+t_score=(var_ratio_by_period[1,5]-var_ratio_by_period[2,5])/sqrt(var_ratio_by_period[1,10]+var_ratio_by_period[2,10])
+n = var_ratio_by_period[1,2 ]+ var_ratio_by_period[2,2]-2
+
+2 * pt(-abs(as.numeric(t_score)), df = as.numeric(n))
+```
+
+## smallest and largest CFRs 
+
+### minimums
+```{r}
+mort_df %>%
+  mutate(CFR = tot.deaths.reported/tot.cases.reported) %>%
+  filter(CFR == min(CFR)) %>%
+  dplyr::select(CFR, outbreak.identifier)
+
+```
+
+### maximums
+```{r}
+mort_df %>%
+  mutate(CFR = tot.deaths.reported/tot.cases.reported) %>%
+  filter(CFR == max(CFR)) %>%
+  dplyr::select(CFR, outbreak.identifier)
+
+```
+
+## Median reported deaths overall and grouped
+```{r}
+mort_df %>%
+  group_by(pre.2016.outbreak) %>%
+  summarise(lower_bound=quantile(tot.cases.reported, .25),
+upper_bound=quantile(tot.cases.reported, .75),
+median = median(tot.cases.reported))
+
+mort_df %>%
+  summarise(average_cases = mean(tot.cases.reported),
+            lower_bound=quantile(tot.cases.reported, .25),
+upper_bound=quantile(tot.cases.reported, .75),
+median = median(tot.cases.reported))
+```
+## wilcoxon of median reported cases
+```{r}
+wilcox_test(tot.cases.reported ~ as.factor(pre.2016.outbreak), data = mort_df,
+            distribution = "exact")
+```
+
+
+## smallest and largest outbreaks by total cases 
+
+### minimums
+```{r}
+mort_df %>%
+  filter(tot.cases.reported == min(tot.cases.reported)) %>%
+  dplyr::select(tot.cases.reported, outbreak.identifier)
+
+```
+
+### maximums
+```{r}
+mort_df %>%
+   filter(tot.cases.reported == max(tot.cases.reported)) %>%
+   dplyr::select(tot.cases.reported, outbreak.identifier)
+
+```
+
+
+## figure 3  theme
 ```{r}
 Theme_new <- function(base_size = 12, base_family = "sans") {
   theme_minimal(base_size = base_size, base_family = base_family) +
@@ -552,9 +549,9 @@ Theme_new <- function(base_size = 12, base_family = "sans") {
 ```
 
 
-# histogram of cases log
+# Figure 2 
 ```{r}
-ggplot(data = data[!is.na(data$tot.cases.reported) & !is.na(data$tot.deaths.reported), ], 
+ggplot(data = mort_df, 
        aes(x = as.Date(all.index.case), y = tot.deaths.reported/tot.cases.reported, size = tot.cases.reported)
        ) + 
   geom_point(
@@ -590,37 +587,23 @@ scale_colour_manual(
        (!is.na(data$all.index.case) & !is.na(data$tot.cases.reported)) & !is.na(data$tot.deaths.reported), ]
   
 ggsave(
-  filename = "figure_3.pdf",
+  filename = "figure_2.pdf",
   plot = last_plot(),
   device = cairo_pdf,
   width = 8.5,
   height = 5.5,
   units = "in",
-  path = fig_path
+  path = out_dir
 )
 
 ggsave(
-  filename = "figure_3.png",
+  filename = "figure_2.png",
   plot = last_plot() +Theme_new(base_size = 12),
   device = ragg::agg_png,
   width = 8.5,
   height = 5.5,
   units = "in",
   dpi = 300,
-  path = fig_path
+  path = out_dir
 )
 ```
-
-
-```{r}
-data %>%
-  dplyr::select(outbreak.indicator,cfr_total) %>%
-  arrange(desc(cfr_total))
-data %>%
-  dplyr::select(outbreak.indicator,tot.cases.reported, cfr_total) %>%
-  filter(!is.na(cfr_total)) %>%
-  arrange(desc(tot.cases.reported))
-```
-
-
-#
