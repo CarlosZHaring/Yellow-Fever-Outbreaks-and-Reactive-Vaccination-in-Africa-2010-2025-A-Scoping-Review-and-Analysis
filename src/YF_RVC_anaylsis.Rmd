@@ -89,7 +89,7 @@ df <- df %>%
 ```
 
 
-# creating
+# creating columns
 ```{r}
 df_clean <- df %>%
   mutate(
@@ -109,7 +109,7 @@ df_clean <- df %>%
       reac.vac.one
     )
   )
-df_clean
+
 ```
 
 ## creating and following priority rule
