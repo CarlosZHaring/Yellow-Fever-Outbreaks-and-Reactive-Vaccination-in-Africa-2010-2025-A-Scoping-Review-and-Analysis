@@ -26,10 +26,11 @@ library(webshot2)
 library(coin)
 ```
 
-# Load
+# Load and create output directory
 
 ```{r}
-data <- read.csv("https://raw.githubusercontent.com/CarlosZHaring/Yellow-Fever-Outbreaks-and-Reactive-Vaccination-in-Africa-2010-2025-A-Scoping-Review-and-Analysis/refs/heads/main/data/YF_outbreaks.csv?token=GHSAT0AAAAAAEA6O6QEPLZSMFGN36D4ISLW2SDAB2A",
+out_dir <- "~/Documents/Documents/Yellow Fever/YF_scoping_review/fig"
+data <- read.csv("~/Documents/Documents/Yellow Fever/YF_scoping_review/data/YF_outbreaks.csv",
                  na.strings = c("", "NA", "NaN", "N/A", "null", "NULL", "z"),
                  stringsAsFactors = FALSE)
 ```
@@ -241,7 +242,6 @@ ft_pub <- ft_pub %>%
   align(align = "left", part = "footer")
 
 # Save outputs
-out_dir <- "~/Documents/Documents/Yellow Fever/YF_scoping_review/fig"
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 png_file <- file.path(out_dir, "table_1.png")
 docx_file <- file.path(out_dir, "table_1.docx")

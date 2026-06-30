@@ -6,32 +6,45 @@ output:
   pdf_document: default
   html_document: default
 ---
-
+# Loading relevant packages and files
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## library addition
 ```{r}
 library(tidyverse)
 library(lubridate)
-library(readr)
-library(showtext)
+library(MMWRweek)  # for MMWRweek2Date
+library(gtsummary)
+library(flextable)
+library(summarytools)
+library(fitdistrplus)
+library(webshot2)
+library(coin)
 
 font_add("Arial", regular = "arial.ttf")
 showtext_auto()
 ```
 
+## paths
 ```{r}
-fig_path <- "/Users/carlosh/Documents/Documents/Yellow Fever/YF/fig"
-src_path <- "/Users/carlosh/Documents/Documents/Yellow Fever/YF/src"
-data_path <- "/Users/carlosh/Documents/Documents/Yellow Fever/YF/data"
+out_dir <- "~/Documents/Documents/Yellow Fever/YF_scoping_review/fig"
+src_path <- "~/Documents/Documents/Yellow Fever/YF_scoping_review/src"
+data_path <- "~/Documents/Documents/Yellow Fever/YF_scoping_review/data"
 
-file_path <- file.path(data_path, "yellow fever reorganization.xlsx - complete_info_aggregate.csv")
+file_path <- file.path(data_path, "YF_RVCs.csv")
 ```
 
+## file reading 
 ```{r}
 df <- read_csv(file_path)
+```
 
+# Cleaning/column creation
+
+## date creation
+```{r}
 # parse dates (M/D/YYYY format)
 df <- df %>%
   mutate(
@@ -41,7 +54,7 @@ df <- df %>%
   filter(vacc.marker != "DRC_2014_1_pv") #because there is an aggregate estimate that works better
 ```
 
-# establish vaccination types 
+## establish vaccination types 
 ```{r}
 df <- df %>%
   mutate(
@@ -66,15 +79,9 @@ df <- df %>%
 # establish geography markers
 ```{r}
 geo_cols <- c(
-  "react.vac.region",
-  "react.vac.counties",
-  "react.vac.province",
-  "react.vac.state",
-  "react.vac.zone",
-  "react.vac.district",
-  "react.vac.health.district",
-  "react.vac.subdistrict",
-  "react.vac.locality"
+"Geographic.marker.1",
+"Geographic.marker.2",
+"Geographic.marker.3"
 )
 
 df <- df %>%
@@ -105,14 +112,6 @@ df_clean <- df %>%
 df_clean
 ```
 
-#outlier removal
-```{r}
- df_clean = df_clean %>%
-    filter(outbreak.identifier != "Uganda_2019") %>%
-  filter(outbreak.identifier != "South_Sudan_2020") %>%
-  filter(outbreak.identifier != "Cameroon_2021")
-```
-
 ## creating and following priority rule
 ```{r}
 df_clean <- df_clean %>%
@@ -141,7 +140,7 @@ df_clean <- df_clean %>%
 ```
 
 
-# creating the dataframe of relevent vaccination information 
+## creating the dataframe of relevent vaccination information 
 ```{r}
 campaign_df <- df_clean %>%
   group_by(base_marker) %>%
@@ -154,17 +153,14 @@ campaign_df <- df_clean %>%
     duration = as.numeric(end - start + 1),
         target_pop = sum(reac.target.pop.one),
     vaccinated_pop = sum(reac.vac.one),
-    log_estimate= -log(1-sum(vaccinated_pop)/sum(target_pop))/duration,
+    log_estimate = -log(1-sum(vaccinated_pop)/sum(target_pop))/duration,
     Constant_log_estimate = (1-exp(-log_estimate)),
     n_rows = n(),
-    coverage_weighted = sum(reac.vac.one, na.rm = TRUE) /
+    coverage = sum(reac.vac.one, na.rm = TRUE) /
                         sum(reac.target.pop.one, na.rm = TRUE),
-    rate_weighted   = sum(coverage_weighted) / sum(duration),
-    coverage_unweighted = mean(reac.vac.perc.one, na.rm = TRUE)/100,
-    rate_unweighted = coverage_unweighted / duration,
+    rate = sum(coverage) / sum(duration),
     .groups = "drop"
   )
-campaign_df
 ```
 
 ## classify pre vs post angola camepiagns
@@ -177,31 +173,7 @@ campaign_df <- campaign_df %>%
   )
 ```
 
-## pooled weighted rate
-```{r}
-pooled_weighted <- campaign_df %>%
-  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
-  summarise(
-    pooled_rate = sum(coverage_weighted, na.rm = TRUE) /
-                  sum(duration, na.rm = TRUE)
-  )
-pooled_weighted
-
-campaign_df %>%
-  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
-  dplyr::select(outbreak.identifier, country, year, start, end, coverage_weighted, rate_weighted)
-```
-##pooled weighted rates by outbreak
-```{r}
-campaign_df %>%
-  filter(!is.na(coverage_weighted), !is.na(duration)) %>%
-  group_by(outbreak.identifier) %>%
-  summarise(
-    pooled_rate = sum(coverage_weighted, na.rm = TRUE) /
-                  sum(duration, na.rm = TRUE),
-    n = n()
-  )
-```
+# Results 
 
 ## the pooled weighted variance
 ```{r}
