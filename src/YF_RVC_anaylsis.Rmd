@@ -23,8 +23,6 @@ library(fitdistrplus)
 library(webshot2)
 library(coin)
 
-font_add("Arial", regular = "arial.ttf")
-showtext_auto()
 ```
 
 ## paths
@@ -76,7 +74,7 @@ df <- df %>%
 ```
 
 
-# establish geography markers
+## establish geography markers
 ```{r}
 geo_cols <- c(
 "Geographic.marker.1",
@@ -89,7 +87,7 @@ df <- df %>%
 ```
 
 
-# creating columns
+## creating columns for completing vaccination coverage information
 ```{r}
 df_clean <- df %>%
   mutate(
@@ -153,8 +151,6 @@ campaign_df <- df_clean %>%
     duration = as.numeric(end - start + 1),
         target_pop = sum(reac.target.pop.one),
     vaccinated_pop = sum(reac.vac.one),
-    log_estimate = -log(1-sum(vaccinated_pop)/sum(target_pop))/duration,
-    Constant_log_estimate = (1-exp(-log_estimate)),
     n_rows = n(),
     coverage = sum(reac.vac.one, na.rm = TRUE) /
                         sum(reac.target.pop.one, na.rm = TRUE) * 100,
