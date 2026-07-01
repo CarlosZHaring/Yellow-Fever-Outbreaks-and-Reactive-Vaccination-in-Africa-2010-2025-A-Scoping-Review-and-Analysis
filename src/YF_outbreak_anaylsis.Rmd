@@ -127,6 +127,17 @@ rv_e  <- data$react.vac.eff.date
 data$all.index.to.effvac.days <- days_between(allind, rv_e)
 ```
 
+# number of outbreaks
+```{r}
+nrow(data)
+```
+
+# number of outbreaks pre vs post angola
+```{r}
+data %>%
+  group_by(pre.2016.outbreak) %>%
+  summarise(perc =round(n()/nrow(data)*100,2), n= n())
+```
 
 # creating mortality and time to reactive vaccination dataframes
 ```{r}
@@ -402,10 +413,32 @@ ggsave(
 row_count= nrow(mort_df)
 mort_df %>%
   group_by(pre.2016.outbreak) %>%
-  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported), n = n(), perc = round(n/row_count*100,1))
+  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported) *100, n = n(), perc = round(n/row_count*100,1))
 
 mort_df %>%
-  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported), n = n())
+  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported) * 100, n = n())
+```
+```{r}
+row_count = nrow(mort_df)
+
+var_ratio_by_period <- mort_df %>%
+  filter(!is.na(tot.cases.reported), !is.na(tot.deaths.reported)) %>%
+  summarise(
+    n = n(),
+    Xbar = mean(tot.cases.reported),
+
+    r_hat = sum(tot.deaths.reported) / sum(tot.cases.reported),
+
+    s2_X = var(tot.cases.reported),
+    s2_Y = var(tot.deaths.reported),
+    s_XY = cov(tot.deaths.reported, tot.cases.reported),
+
+    var_ratio = (1 / (n * Xbar^2)) *
+      (r_hat^2 * s2_X + s2_Y - 2 * r_hat * s_XY),
+
+    se_ratio = sqrt(var_ratio),
+  )
+var_ratio_by_period
 ```
 
 
@@ -418,7 +451,7 @@ var_ratio_by_period <- mort_df %>%
   group_by(pre.2016.outbreak) %>%
   summarise(
     n = n(),
-    perc = n/row_count *100,
+    perc = round(n/row_count *100,2),
     Xbar = mean(tot.cases.reported),
 
     r_hat = sum(tot.deaths.reported) / sum(tot.cases.reported),
@@ -438,10 +471,9 @@ var_ratio_by_period
 ## Welch's T-test for CFR
 ```{r}
 
-t_score=(var_ratio_by_period[1,5]-var_ratio_by_period[2,5])/sqrt(var_ratio_by_period[1,10]+var_ratio_by_period[2,10])
-n = var_ratio_by_period[1,2 ]+ var_ratio_by_period[2,2]-2
-
-2 * pt(-abs(as.numeric(t_score)), df = as.numeric(n))
+t_score_a = (var_ratio_by_period[1,5] - var_ratio_by_period[2,5]) / sqrt(var_ratio_by_period[1,9] + var_ratio_by_period[2,9])
+welch_df = ((var_ratio_by_period[1,9]  + var_ratio_by_period[2,9]) ^ 2) / ((var_ratio_by_period[1,9] ^ 2 / (var_ratio_by_period[1,2]-1)) + (var_ratio_by_period[2,9] ^ 2 / (var_ratio_by_period[2,2]-1)))
+2 * pt(-abs(as.numeric(t_score_a)), df = as.numeric(welch_df))
 ```
 
 ## smallest and largest CFRs 

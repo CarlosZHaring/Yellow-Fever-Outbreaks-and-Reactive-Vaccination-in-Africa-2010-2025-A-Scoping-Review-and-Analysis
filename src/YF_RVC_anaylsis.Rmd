@@ -125,7 +125,7 @@ df_clean <- df_clean %>%
   slice_head(n = 1) %>%
   ungroup()
 
-df_clean
+
 ```
 
 ## mark by country and year
@@ -197,6 +197,7 @@ ratio_var
 
 ## the pooled weighted estimate and standard error by period
 ```{r}
+
 tot = nrow(campaign_df %>%
              filter(!is.na(coverage), !is.na(duration))) 
 
@@ -225,11 +226,23 @@ var_ratio_by_period
 ```
 
 
-## T test
+## T welch's test
 ```{r}
-t_score_a = (var_ratio_by_period[1,5] - var_ratio_by_period[2,5]) / sqrt(var_ratio_by_period[1,10] + var_ratio_by_period[2,10])
-n = tot - 2
-2 * pt(-as.numeric(t_score_a), df = n)
+t_score_a
+t_score_a = (var_ratio_by_period[1,5] - var_ratio_by_period[2,5]) / sqrt(var_ratio_by_period[1,9] + var_ratio_by_period[2,9])
+welch_df = ((var_ratio_by_period[1,9]  + var_ratio_by_period[2,9]) ^ 2) / (var_ratio_by_period[1,9] ^ 2 / (var_ratio_by_period[1,2]-1) + (var_ratio_by_period[2,9] ^ 2 / (var_ratio_by_period[2,2]-1)))
+2 * pt(-abs(as.numeric(t_score_a)), df = as.numeric(welch_df))
+```
+
+
+
+## the median and iqr of reactive vacination coverage
+```{r}
+campaign_df %>%
+  filter(!is.na(coverage), !is.na(duration)) %>%
+  summarise(median = median(coverage),
+            lb = quantile(coverage, .25),
+            ub = quantile(coverage, .75))
 ```
 
 
