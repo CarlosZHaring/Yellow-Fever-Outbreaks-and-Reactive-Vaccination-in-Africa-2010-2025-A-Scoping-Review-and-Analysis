@@ -322,7 +322,7 @@ Theme = function(base_size = 12, base_family = "sans") {
         face = "bold",
         hjust = 0
       ),
-      legend.text = element_text(size = base_size,
+      legend.text = element_text(size = base_size-2,
                                 margin = margin(l = 2)),
 
       strip.text = element_text(size = base_size + 1, face = "bold"),
@@ -345,13 +345,13 @@ ggplot(data = ttv_df,
            size = tot.cases.reported)
           ) +
   geom_vline(
-    aes(xintercept = as.Date("2017-02-14"), colour = "End of 2016 DRC outbreak"),
+    aes(xintercept = as.Date("2017-02-14"), colour = "End of 2016 Angola/DRC outbreak"),
     linetype = "solid",
     linewidth = 1
 ) +
 scale_colour_manual(
   name = NULL,
-  values = c("End of 2016 DRC outbreak" = "red")
+  values = c("End of 2016 Angola/DRC outbreak" = "red")
 )  +
   scale_size_continuous(name = "Total Reported Cases",
                         breaks = c(10, 100, 500, 1000),
@@ -402,6 +402,18 @@ ggsave(
   units = "in",
   dpi = 300,
   path = out_dir
+)
+
+ggsave(
+  filename = "figure_1.tiff",
+  plot = last_plot(),
+  device = "tiff",
+  width = 8.5,
+  height = 5.5,
+  units = "in",
+  dpi = 900,
+  path = out_dir,
+  compression = "lzw"
 )
 ```
 
@@ -571,7 +583,7 @@ Theme_new <- function(base_size = 12, base_family = "sans") {
         face = "bold",
         hjust = 0
       ),
-      legend.text = element_text(size = base_size,
+      legend.text = element_text(size = base_size-2,
                                 margin = margin(l = 2)),
 
       strip.text = element_text(size = base_size + 1, face = "bold"),
@@ -592,13 +604,13 @@ ggplot(data = mort_df,
           
           ) +
   geom_vline(
-    aes(xintercept = as.Date("2017-02-14"), colour = "End of Angola/DRC outbreak"),
+    aes(xintercept = as.Date("2017-02-14"), colour = "End of 2016 Angola/DRC outbreak"),
     linetype = "solid",
     linewidth = 1
 ) +
 scale_colour_manual(
   name = NULL,
-  values = c("End of Angola/DRC outbreak" = "red")
+  values = c("End of 2016 Angola/DRC outbreak" = "red")
 ) + 
    scale_x_date(
     date_breaks = "1 year",
@@ -637,5 +649,17 @@ ggsave(
   units = "in",
   dpi = 300,
   path = out_dir
+)
+
+ggsave(
+  filename = "figure_2.tiff",
+  plot = last_plot(),
+  device = "tiff",
+  width = 8.5,
+  height = 5.5,
+  units = "in",
+  dpi = 900,
+  path = out_dir,
+  compression = "lzw"
 )
 ```
