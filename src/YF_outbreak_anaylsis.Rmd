@@ -405,14 +405,19 @@ ggsave(
 )
 
 ggsave(
-  filename = "figure_1.tiff",
-  plot = last_plot(),
-  device = "tiff",
+  filename = "figure_2.tiff",
+  plot = last_plot() +
+    theme(
+      plot.background  = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA)
+    ),
+  device = ragg::agg_tiff,
   width = 8.5,
   height = 5.5,
   units = "in",
   dpi = 900,
   path = out_dir,
+  bg = "white",
   compression = "lzw"
 )
 ```
@@ -653,13 +658,18 @@ ggsave(
 
 ggsave(
   filename = "figure_2.tiff",
-  plot = last_plot(),
-  device = "tiff",
+  plot = last_plot() +
+    theme(
+      plot.background  = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA)
+    ),
+  device = ragg::agg_tiff,
   width = 8.5,
   height = 5.5,
   units = "in",
   dpi = 900,
   path = out_dir,
+  bg = "white",
   compression = "lzw"
 )
 ```
