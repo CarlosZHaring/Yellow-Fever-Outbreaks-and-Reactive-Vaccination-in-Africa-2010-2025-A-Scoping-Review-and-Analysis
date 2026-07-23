@@ -271,12 +271,15 @@ coin::wilcox_test(data = ttv_df, all.index.to.effvac.days ~ as.factor(pre.2016.o
 ```
 ## summary table pre and post angola
 ```{r}
-ttv_df %>%
+med_delay = ttv_df %>%
   group_by(as.factor(pre.2016.outbreak)) %>%
     summarise(
             lower_bound=quantile(all.index.to.effvac.days, .25),
 upper_bound=quantile(all.index.to.effvac.days, .75),
 median = median(all.index.to.effvac.days))
+med_delay
+pre_delay_med=as.numeric(med_delay$median[2])
+post_delay_med=as.numeric(med_delay$median[1])
 ```
 
 ## smallest and largest delays 
@@ -334,54 +337,91 @@ Theme = function(base_size = 12, base_family = "sans") {
 
 ## Figure 1: Delay of reactive vaccinations
 ```{r}
-ggplot(data = ttv_df, 
-       aes(x = as.Date(all.index.case), y = all.index.to.effvac.days)
-       ) + 
-  geom_point(width = 75, 
-           alpha = 1,
-           fill = "blue",
-           colour = "black",
-           linewidth = .5, aes(
-           size = tot.cases.reported)
-          ) +
+cutoff_date <- as.Date("2017-02-14")
+
+ggplot(
+  data = ttv_df,
+  aes(x = as.Date(all.index.case), y = all.index.to.effvac.days)
+) + 
+  geom_point(
+    aes(size = tot.cases.reported),
+    alpha = 1,
+    fill = "blue",
+    colour = "black",
+    linewidth = .5
+  ) +
+  
   geom_vline(
-    aes(xintercept = as.Date("2017-02-14"), colour = "End of 2016 Angola/DRC outbreak"),
+    aes(xintercept = cutoff_date, colour = "End of 2016 Angola/DRC outbreak"),
     linetype = "solid",
     linewidth = 1
-) +
-scale_colour_manual(
-  name = NULL,
-  values = c("End of 2016 Angola/DRC outbreak" = "red")
-)  +
-  scale_size_continuous(name = "Total Reported Cases",
-                        breaks = c(10, 100, 500, 1000),
-                        range = c(3, 15)
-                        
-                      ) +
+  ) +
   
-   scale_x_date(
+  geom_segment(
+    aes(
+      x = min(as.Date(ttv_df$all.index.case), na.rm = TRUE),
+      xend = cutoff_date,
+      y = pre_delay_med,
+      yend = pre_delay_med,
+      colour = "Median RVC delay (days)"
+    ),
+    linetype = "dashed",
+    linewidth = 1
+  ) +
+  
+  geom_segment(
+    aes(
+      x = cutoff_date,
+      xend = max(as.Date(ttv_df$all.index.case), na.rm = TRUE),
+      y = post_delay_med,
+      yend = post_delay_med,
+      colour = "Median RVC delay (days)"
+    ),
+    linetype = "dashed",
+    linewidth = 1
+  ) +
+  
+  scale_colour_manual(
+    name = NULL,
+    values = c(
+      "End of 2016 Angola/DRC outbreak" = "blue",
+      "Median RVC delay (days)" = "red"
+    )
+  ) +
+  
+  scale_size_continuous(
+    name = "Total Reported Cases",
+    breaks = c(10, 100, 500, 1000),
+    range = c(3, 15)
+  ) +
+  
+  scale_x_date(
     date_breaks = "1 year",
     date_labels = "%Y"
-    ) +
-  xlab("Date of Index Case"
   ) +
-  ylab("Index case to Reactive Vaccination (Days)"
-  ) +
-   annotate("label", 
-           label = "Angola 2015-2016", 
-           x = as.Date("2015-12-5"), 
-           y = 80
-           ) +
-     annotate("label", 
-           label = "Kenya 2022", 
-           x = as.Date("2022-1-5"), 
-           y = 210
-           ) +
-  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))
-  ) + 
-  labs() +
-  Theme() +
-  theme(legend.position = "bottom")
+  
+  xlab("Date of Index Case") +
+  ylab("Index case to Reactive Vaccination (Days)") +
+  
+  annotate("label",
+           label = "Angola 2015-2016",
+           x = as.Date("2015-12-05"),
+           y = 80) +
+  annotate("label",
+           label = "Kenya 2022",
+           x = as.Date("2022-01-05"),
+           y = 210) +
+  
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  theme(legend.position = "bottom") +
+    theme(
+  legend.position = "bottom",
+  legend.direction = "horizontal"
+) +
+guides(
+  colour = guide_legend(nrow = 2, byrow = TRUE),
+  size = guide_legend(nrow = 2, byrow = TRUE)
+)
   
 ggsave(
   filename = "figure_1.pdf",
@@ -405,11 +445,13 @@ ggsave(
 )
 
 ggsave(
-  filename = "figure_2.tiff",
+  filename = "figure_1.tiff",
   plot = last_plot() +
     theme(
-      plot.background  = element_rect(fill = "white", color = NA),
-      panel.background = element_rect(fill = "white", color = NA)
+      plot.background   = element_rect(fill = "white", color = NA),
+      panel.background  = element_rect(fill = "white", color = NA),
+      panel.grid.major  = element_line(color = "grey80", linewidth = 0.4),
+      panel.grid.minor  = element_line(color = "grey90", linewidth = 0.2)
     ),
   device = ragg::agg_tiff,
   width = 8.5,
@@ -483,6 +525,9 @@ var_ratio_by_period <- mort_df %>%
     se_ratio = sqrt(var_ratio),
   )
 var_ratio_by_period
+
+mort_pre_median = as.numeric(var_ratio_by_period$r_hat[2])
+mort_post_median = as.numeric(var_ratio_by_period$r_hat[1])
 ```
 
 ## Welch's T-test for CFR
@@ -515,11 +560,13 @@ mort_df %>%
 
 ## Median reported deaths overall and grouped
 ```{r}
-mort_df %>%
+mort_period_median = mort_df %>%
   group_by(pre.2016.outbreak) %>%
   summarise(lower_bound=quantile(tot.cases.reported, .25),
 upper_bound=quantile(tot.cases.reported, .75),
 median = median(tot.cases.reported))
+mort_period_median
+
 
 mort_df %>%
   summarise(average_cases = mean(tot.cases.reported),
@@ -601,37 +648,73 @@ Theme_new <- function(base_size = 12, base_family = "sans") {
 # Figure 2 
 ```{r}
 ggplot(data = mort_df, 
-       aes(x = as.Date(all.index.case), y = tot.deaths.reported/tot.cases.reported, size = tot.cases.reported)
-       ) + 
+            aes(x = as.Date(all.index.case),
+                y = tot.deaths.reported / tot.cases.reported,
+                size = tot.cases.reported)) + 
   geom_point(
-           fill = "blue",
-           colour = "black"
-          
-          ) +
+    fill = "blue",
+    colour = "black"
+  ) +
   geom_vline(
-    aes(xintercept = as.Date("2017-02-14"), colour = "End of 2016 Angola/DRC outbreak"),
+    aes(xintercept = as.Date("2017-02-14"),
+        colour = "End of 2016 Angola/DRC outbreak"),
     linetype = "solid",
     linewidth = 1
+  ) +
+geom_segment(
+  aes(
+    x = min(as.Date(mort_df$all.index.case), na.rm = TRUE),
+    xend = as.Date("2017-02-14"),
+    y = mort_pre_median,
+    yend = mort_pre_median,
+    colour = "Overall CFR"
+  ),
+  linetype = "dashed",
+  linewidth = 1
+) +
+geom_segment(
+  aes(
+    x = as.Date("2017-02-14"),
+    xend = max(as.Date(mort_df$all.index.case), na.rm = TRUE),
+    y = mort_post_median,
+    yend = mort_post_median,
+    colour = "Overall CFR"
+  ),
+  linetype = "dashed",
+  linewidth = 1
 ) +
 scale_colour_manual(
   name = NULL,
-  values = c("End of 2016 Angola/DRC outbreak" = "red")
-) + 
-   scale_x_date(
+  values = c(
+    "End of 2016 Angola/DRC outbreak" = "blue",
+    "Overall CFR" = "red"
+  )) + 
+  scale_x_date(
     date_breaks = "1 year",
     date_labels = "%Y"
-    )  +
-  xlab("Date of Index Case"
   ) +
-  ylab("Case Fatality Ratio"
+  xlab("Date of Index Case") +
+  ylab("Case Fatality Ratio") +
+  coord_cartesian(ylim = c(0, 1)) + 
+  scale_size_continuous(
+    name = "Total Reported Cases",
+    breaks = c(10, 100, 500, 1000),
+    range = c(2, 13)
   ) +
-  coord_cartesian(ylim = c(0,1)
-  ) + 
-  scale_size_continuous(name = "Total Reported Cases",
-                         breaks = c(10, 100, 500, 1000),
-                        range = c(2, 13)) +
   Theme_new() +
-  theme(legend.position = "bottom")
+  theme(
+    legend.position = "bottom",
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA)
+  ) +
+theme(
+  legend.position = "bottom",
+  legend.direction = "horizontal"
+) +
+guides(
+  size = guide_legend(order = 1),
+  colour = guide_legend(order = 2, nrow = 2, byrow = TRUE)
+)
   data[data$all.index.to.effvac.days < 234 & 
        (!is.na(data$all.index.case) & !is.na(data$tot.cases.reported)) & !is.na(data$tot.deaths.reported), ]
   
@@ -660,6 +743,8 @@ ggsave(
   filename = "figure_2.tiff",
   plot = last_plot() +
     theme(
+    panel.grid.major = element_line(color = "grey80"),
+    panel.grid.minor = element_line(color = "grey90"),
       plot.background  = element_rect(fill = "white", color = NA),
       panel.background = element_rect(fill = "white", color = NA)
     ),
