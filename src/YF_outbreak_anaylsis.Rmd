@@ -365,7 +365,7 @@ ggplot(
       yend = pre_delay_med,
       colour = "Median RVC delay (days)"
     ),
-    linetype = "dashed",
+    linetype = "11",
     linewidth = 1
   ) +
   
@@ -377,7 +377,7 @@ ggplot(
       yend = post_delay_med,
       colour = "Median RVC delay (days)"
     ),
-    linetype = "dashed",
+    linetype = "11",
     linewidth = 1
   ) +
   
@@ -404,13 +404,25 @@ ggplot(
   ylab("Index case to Reactive Vaccination (Days)") +
   
   annotate("label",
-           label = "Angola 2015-2016",
+           label = "Angola\n2015-2016",
            x = as.Date("2015-12-05"),
-           y = 80) +
+           y = 30) +
+  
   annotate("label",
            label = "Kenya 2022",
            x = as.Date("2022-01-05"),
            y = 210) +
+  
+    annotate("label",
+           label = "median delay, 2010-2016: 108 days",
+           x = as.Date("2013-06-05"),
+           y = 120) +
+  
+      annotate("label",
+           label = "median delay, 2017-2025: 79 days",
+           x = as.Date("2020-01-05"),
+           y = 90,
+          ) +
   
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
   theme(legend.position = "bottom") +
@@ -667,27 +679,39 @@ geom_segment(
     xend = as.Date("2017-02-14"),
     y = mort_pre_median,
     yend = mort_pre_median,
-    colour = "Overall CFR"
+    colour = "Pooled CFR"
   ),
-  linetype = "dashed",
+  linetype = "11",
   linewidth = 1
 ) +
+  
+      annotate("label",
+           label = "pooled CFR, 2010-2016: 8.5%",
+           x = as.Date("2013-06-05"),
+           y = .12) +
+
+      annotate("label",
+           label = "pooled CFR, 2017-2025: 4.9%",
+           x = as.Date("2020-01-05"),
+           y = .125,
+          ) +
+  
 geom_segment(
   aes(
     x = as.Date("2017-02-14"),
     xend = max(as.Date(mort_df$all.index.case), na.rm = TRUE),
     y = mort_post_median,
     yend = mort_post_median,
-    colour = "Overall CFR"
+    colour = "Pooled CFR"
   ),
-  linetype = "dashed",
+  linetype = "11",
   linewidth = 1
 ) +
 scale_colour_manual(
   name = NULL,
   values = c(
     "End of 2016 Angola/DRC outbreak" = "blue",
-    "Overall CFR" = "red"
+    "Pooled CFR" = "red"
   )) + 
   scale_x_date(
     date_breaks = "1 year",
