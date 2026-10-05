@@ -27,9 +27,9 @@ library(coin)
 
 ## paths
 ```{r}
-out_dir <- "~/Documents/Documents/Yellow Fever/YF_scoping_review/fig"
-src_path <- "~/Documents/Documents/Yellow Fever/YF_scoping_review/src"
-data_path <- "~/Documents/Documents/Yellow Fever/YF_scoping_review/data"
+out_dir <- "~/Documents/Yellow Fever/YF_scoping_review/fig"
+src_path <- "~/Documents/Yellow Fever/YF_scoping_review/src"
+data_path <- "~/Documents/Yellow Fever/YF_scoping_review/data"
 
 file_path <- file.path(data_path, "YF_RVCs.csv")
 ```

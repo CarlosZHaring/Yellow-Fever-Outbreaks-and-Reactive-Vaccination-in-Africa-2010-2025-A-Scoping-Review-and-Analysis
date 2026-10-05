@@ -14,7 +14,6 @@ knitr::opts_chunk$set(echo = TRUE)
 # Setup
 
 ```{r}
-
 library(tidyverse)
 library(lubridate)
 library(MMWRweek)  # for MMWRweek2Date
@@ -29,8 +28,8 @@ library(coin)
 # Load and create output directory
 
 ```{r}
-out_dir <- "~/Documents/Documents/Yellow Fever/YF_scoping_review/fig"
-data <- read.csv("~/Documents/Documents/Yellow Fever/YF_scoping_review/data/YF_outbreaks.csv",
+out_dir <- "~/Documents/Yellow Fever/YF_scoping_review/fig"
+data <- read.csv("~/Documents/Yellow Fever/YF_scoping_review/data/YF_outbreaks.csv",
                  na.strings = c("", "NA", "NaN", "N/A", "null", "NULL", "z"),
                  stringsAsFactors = FALSE)
 ```
@@ -145,7 +144,7 @@ ttv_df = data %>%
   filter(!is.na(all.index.to.effvac.days))
 
 mort_df = data %>%
-  filter(!is.na(tot.cases.reported), !is.na(tot.deaths.reported))
+  filter(!is.na(tot.cases.confirmed), !is.na(tot.deaths.confirmed))
 ```
 
 # Time to reactive vaccination analysis
@@ -190,7 +189,7 @@ and the vaccination campaign is to small relative to the large delay seen.
 ```{r}
 ttv_df %>%
   group_by(pre.2016.outbreak) %>%
-  summarise(n= n(), per = n()/nrow(pub_table) * 100)
+  summarise(n= n(), per = n()/nrow(ttv_df) * 100)
 ```
 
 ## Table 1, table of reactive vaccination campaigns 
@@ -202,16 +201,16 @@ pub_table <- ttv_df %>%
     Year = as.character(as.integer(outbreak.year)),     # force integer -> character (no commas)
     Country = country,
     `Days: Index → Reactive Vaccination` = all.index.to.effvac.days,
-    `Total Cases` = tot.cases.reported,
-    `Total Deaths` = tot.deaths.reported,
-    CFR = tot.deaths.reported / tot.cases.reported
+      `Confirmed Cases` = tot.cases.confirmed,
+    `Confirmed Deaths` = tot.deaths.confirmed,
+    CFR = tot.deaths.confirmed / tot.cases.confirmed
   ) 
 # Build display table (convert numerics to plain character, no comma formatting)
 display_tbl <- pub_table %>%
   mutate(
     `Days: Index → Reactive Vaccination` = as.character(`Days: Index → Reactive Vaccination`),
-    `Total Cases` = ifelse(is.na(`Total Cases`), "Unknown", as.character(as.integer(`Total Cases`))),
-    `Total Deaths` = ifelse(is.na(`Total Deaths`), "Unknown", as.character(as.integer(`Total Deaths`))),
+    `Confirmed Cases` = ifelse(is.na(`Confirmed Cases`), "Unknown", as.character(as.integer(`Confirmed Cases`))),
+    `Confirmed Deaths` = ifelse(is.na(`Confirmed Deaths`), "Unknown", as.character(as.integer(`Confirmed Deaths`))),
     `CFR` = ifelse(is.na(CFR), "Unknown", as.character(round(CFR,2)))
   )
 
@@ -226,8 +225,8 @@ ft_pub <- flextable(display_tbl) %>%
     Year = "Year",
     Country = "Country",
     `Days: Index → Reactive Vaccination` = "Days: Index Case to Reactive Vaccination",
-    `Total Cases` = "Total Cases",
-    `Total Deaths` = "Total Deaths",
+    `Confirmed Cases` = "Confirmed Cases",
+    `Confirmed Deaths` = "Confirmed Deaths",
     `Confirmed Cases` = "Confirmed Cases",
     `Confirmed Deaths` = "Confirmed Deaths",
     `CFR` = "CFR"
@@ -269,6 +268,7 @@ ft_pub
 ```{r}
 coin::wilcox_test(data = ttv_df, all.index.to.effvac.days ~ as.factor(pre.2016.outbreak), distribution = "exact") # use this for ties
 ```
+
 ## summary table pre and post angola
 ```{r}
 med_delay = ttv_df %>%
@@ -300,6 +300,7 @@ ttv_df %>%
    dplyr::select(outbreak.identifier, all.index.to.effvac.days) %>%
   filter(all.index.to.effvac.days == max(all.index.to.effvac.days))
 ```
+
 ## Theme for figure 1 plot
 ```{r}
 Theme = function(base_size = 12, base_family = "sans") {
@@ -344,7 +345,7 @@ ggplot(
   aes(x = as.Date(all.index.case), y = all.index.to.effvac.days)
 ) + 
   geom_point(
-    aes(size = tot.cases.reported),
+    aes(size = tot.cases.confirmed),
     alpha = 1,
     fill = "blue",
     colour = "black",
@@ -390,8 +391,8 @@ ggplot(
   ) +
   
   scale_size_continuous(
-    name = "Total Reported Cases",
-    breaks = c(10, 100, 500, 1000),
+    name = "Confirmed Cases",
+    breaks = c(1, 5, 10, 50, 100),
     range = c(3, 15)
   ) +
   
@@ -408,15 +409,15 @@ ggplot(
            x = as.Date("2015-12-05"),
            y = 30) +
   
-  annotate("label",
-           label = "Kenya 2022",
-           x = as.Date("2022-01-05"),
-           y = 210) +
+  # annotate("label",
+  #          label = "Kenya 2022",
+  #          x = as.Date("2022-01-05"),
+  #          y = 210) +
   
     annotate("label",
            label = "median delay, 2010-2016: 108 days",
            x = as.Date("2013-06-05"),
-           y = 120) +
+           y = 125) +
   
       annotate("label",
            label = "median delay, 2017-2025: 79 days",
@@ -484,25 +485,25 @@ ggsave(
 row_count= nrow(mort_df)
 mort_df %>%
   group_by(pre.2016.outbreak) %>%
-  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported) *100, n = n(), perc = round(n/row_count*100,1))
+  summarise(CFR = sum(tot.deaths.confirmed)/sum(tot.cases.confirmed) *100, n = n(), perc = round(n/row_count*100,1))
 
 mort_df %>%
-  summarise(CFR = sum(tot.deaths.reported)/sum(tot.cases.reported) * 100, n = n())
+  summarise(CFR = sum(tot.deaths.confirmed)/sum(tot.cases.confirmed) * 100, n = n())
 ```
 ```{r}
 row_count = nrow(mort_df)
 
 var_ratio_by_period <- mort_df %>%
-  filter(!is.na(tot.cases.reported), !is.na(tot.deaths.reported)) %>%
+  filter(!is.na(tot.deaths.confirmed), !is.na(tot.deaths.confirmed)) %>%
   summarise(
     n = n(),
-    Xbar = mean(tot.cases.reported),
+    Xbar = mean(tot.deaths.confirmed),
 
-    r_hat = sum(tot.deaths.reported) / sum(tot.cases.reported),
+    r_hat = sum(tot.deaths.confirmed) / sum(tot.cases.confirmed),
 
-    s2_X = var(tot.cases.reported),
-    s2_Y = var(tot.deaths.reported),
-    s_XY = cov(tot.deaths.reported, tot.cases.reported),
+    s2_X = var(tot.cases.confirmed),
+    s2_Y = var(tot.deaths.confirmed),
+    s_XY = cov(tot.deaths.confirmed, tot.cases.confirmed),
 
     var_ratio = (1 / (n * Xbar^2)) *
       (r_hat^2 * s2_X + s2_Y - 2 * r_hat * s_XY),
@@ -518,18 +519,18 @@ var_ratio_by_period
 row_count = nrow(mort_df)
 
 var_ratio_by_period <- mort_df %>%
-  filter(!is.na(tot.cases.reported), !is.na(tot.deaths.reported)) %>%
+  filter(!is.na(tot.cases.confirmed), !is.na(tot.deaths.confirmed)) %>%
   group_by(pre.2016.outbreak) %>%
   summarise(
     n = n(),
     perc = round(n/row_count *100,2),
-    Xbar = mean(tot.cases.reported),
+    Xbar = mean(tot.cases.confirmed),
 
-    r_hat = sum(tot.deaths.reported) / sum(tot.cases.reported),
+    r_hat = sum(tot.deaths.confirmed) / sum(tot.cases.confirmed),
 
-    s2_X = var(tot.cases.reported),
-    s2_Y = var(tot.deaths.reported),
-    s_XY = cov(tot.deaths.reported, tot.cases.reported),
+    s2_X = var(tot.cases.confirmed),
+    s2_Y = var(tot.deaths.confirmed),
+    s_XY = cov(tot.deaths.confirmed, tot.cases.confirmed),
 
     var_ratio = (1 / (n * Xbar^2)) *
       (r_hat^2 * s2_X + s2_Y - 2 * r_hat * s_XY),
@@ -555,7 +556,7 @@ welch_df = ((var_ratio_by_period[1,9]  + var_ratio_by_period[2,9]) ^ 2) / ((var_
 ### minimums
 ```{r}
 mort_df %>%
-  mutate(CFR = tot.deaths.reported/tot.cases.reported) %>%
+  mutate(CFR = tot.deaths.confirmed/tot.cases.confirmed) %>%
   filter(CFR == min(CFR)) %>%
   dplyr::select(CFR, outbreak.identifier)
 
@@ -564,55 +565,62 @@ mort_df %>%
 ### maximums
 ```{r}
 mort_df %>%
-  mutate(CFR = tot.deaths.reported/tot.cases.reported) %>%
+  mutate(CFR = tot.deaths.confirmed/tot.cases.confirmed) %>%
   filter(CFR == max(CFR)) %>%
   dplyr::select(CFR, outbreak.identifier)
 
 ```
 
-## Median reported deaths overall and grouped
+## Median confirmed deaths overall and grouped
 ```{r}
 mort_period_median = mort_df %>%
   group_by(pre.2016.outbreak) %>%
-  summarise(lower_bound=quantile(tot.cases.reported, .25),
-upper_bound=quantile(tot.cases.reported, .75),
-median = median(tot.cases.reported))
+  summarise(lower_bound=quantile(tot.cases.confirmed, .25),
+upper_bound=quantile(tot.cases.confirmed, .75),
+median = median(tot.cases.confirmed))
 mort_period_median
 
 
 mort_df %>%
-  summarise(average_cases = mean(tot.cases.reported),
-            lower_bound=quantile(tot.cases.reported, .25),
-upper_bound=quantile(tot.cases.reported, .75),
-median = median(tot.cases.reported))
+  summarise(average_cases = mean(tot.cases.confirmed),
+            lower_bound=quantile(tot.cases.confirmed, .25),
+upper_bound=quantile(tot.cases.confirmed, .75),
+median = median(tot.cases.confirmed))
 ```
 ## wilcoxon of median reported cases
 ```{r}
-wilcox_test(tot.cases.reported ~ as.factor(pre.2016.outbreak), data = mort_df,
+wilcox_test(tot.cases.confirmed ~ as.factor(pre.2016.outbreak), data = mort_df,
             distribution = "exact")
 ```
 
 
-## smallest and largest outbreaks by total cases 
+## smallest and largest outbreaks by Confirmed Cases 
 
 ### minimums
 ```{r}
 mort_df %>%
-  filter(tot.cases.reported == min(tot.cases.reported)) %>%
-  dplyr::select(tot.cases.reported, outbreak.identifier)
+  filter(tot.cases.confirmed == min(tot.cases.confirmed)) %>%
+  dplyr::select(tot.cases.confirmed, outbreak.identifier)
 
 ```
 
 ### maximums
 ```{r}
 mort_df %>%
-   filter(tot.cases.reported == max(tot.cases.reported)) %>%
-   dplyr::select(tot.cases.reported, outbreak.identifier)
+   filter(tot.cases.confirmed == max(tot.cases.confirmed)) %>%
+   dplyr::select(tot.cases.confirmed, outbreak.identifier)
 
 ```
 
+### For 2016 DRC outbreak too
+```{r}
+mort_df %>%
+   filter(outbreak.identifier == "DRC_2016") %>%
+   dplyr::select(tot.cases.confirmed, outbreak.identifier)
+```
 
-## figure 3  theme
+
+## figure 2 theme
 ```{r}
 Theme_new <- function(base_size = 12, base_family = "sans") {
   theme_minimal(base_size = base_size, base_family = base_family) +
@@ -661,8 +669,8 @@ Theme_new <- function(base_size = 12, base_family = "sans") {
 ```{r}
 ggplot(data = mort_df, 
             aes(x = as.Date(all.index.case),
-                y = tot.deaths.reported / tot.cases.reported,
-                size = tot.cases.reported)) + 
+                y = tot.deaths.confirmed / tot.cases.confirmed,
+                size = tot.cases.confirmed)) + 
   geom_point(
     fill = "blue",
     colour = "black"
@@ -686,12 +694,12 @@ geom_segment(
 ) +
   
       annotate("label",
-           label = "pooled CFR, 2010-2016: 8.5%",
+           label = "pooled CFR, 2010-2016: 15.7%",
            x = as.Date("2013-06-05"),
            y = .12) +
 
       annotate("label",
-           label = "pooled CFR, 2017-2025: 4.9%",
+           label = "pooled CFR, 2017-2025: 26.0%",
            x = as.Date("2020-01-05"),
            y = .125,
           ) +
@@ -721,8 +729,8 @@ scale_colour_manual(
   ylab("Case Fatality Ratio") +
   coord_cartesian(ylim = c(0, 1)) + 
   scale_size_continuous(
-    name = "Total Reported Cases",
-    breaks = c(10, 100, 500, 1000),
+    name = "Confirmed Cases",
+    breaks = c(1, 5, 10, 50, 100),
     range = c(2, 13)
   ) +
   Theme_new() +
@@ -740,7 +748,7 @@ guides(
   colour = guide_legend(order = 2, nrow = 2, byrow = TRUE)
 )
   data[data$all.index.to.effvac.days < 234 & 
-       (!is.na(data$all.index.case) & !is.na(data$tot.cases.reported)) & !is.na(data$tot.deaths.reported), ]
+       (!is.na(data$all.index.case) & !is.na(data$tot.cases.confirmed)) & !is.na(data$tot.deaths.confirmed), ]
   
 ggsave(
   filename = "figure_2.pdf",
