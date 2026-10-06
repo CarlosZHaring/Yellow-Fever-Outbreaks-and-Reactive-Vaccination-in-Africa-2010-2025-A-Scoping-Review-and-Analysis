@@ -264,6 +264,79 @@ ft_pub
 
 ```
 
+## Table S3: Yellow fever outbreaks in Africa (2010-2025)
+```{r}
+# Filter to rows with non-missing days-to-mass and year
+pub_table <- ttv_df %>%
+  arrange((all.index.case)) %>%
+  transmute(
+    Year = as.character(as.integer(outbreak.year)),     # force integer -> character (no commas)
+    Country = country,
+    `Days: Index → Reactive Vaccination` = all.index.to.effvac.days,
+      `Suspected Cases` = tot.cases.sus,
+    `Suspected Deaths` = tot.deaths.sus,
+    CFR = tot.deaths.sus / tot.cases.sus
+  ) 
+# Build display table (convert numerics to plain character, no comma formatting)
+display_tbl <- pub_table %>%
+  mutate(
+    `Days: Index → Reactive Vaccination` = as.character(`Days: Index → Reactive Vaccination`),
+    `Suspected Cases` = ifelse(is.na(`Suspected Cases`), "Unknown", as.character(as.integer(`Suspected Cases`))),
+    `Suspected Deaths` = ifelse(is.na(`Suspected Deaths`), "Unknown", as.character(as.integer(`Suspected Deaths`))),
+    `CFR` = ifelse(is.na(CFR), "Unknown", as.character(round(CFR,2)))
+  )
+
+ft_pub <- flextable(display_tbl) %>%
+  theme_booktabs() %>%
+  bold(part = "header") %>%
+  align(j = 1, align = "left", part = "body") %>%
+  align(j = 2:ncol(display_tbl), align = "center", part = "all") %>%
+  autofit() %>%
+  fontsize(size = 10, part = "all") %>%
+  set_header_labels(
+    Year = "Year",
+    Country = "Country",
+    `Days: Index → Reactive Vaccination` = "Days: Index Case to Reactive Vaccination",
+    `Suspected Cases` = "Suspected Cases",
+    `Suspected Deaths` = "Suspected Deaths",
+    `Suspected Cases` = "Suspected Cases",
+    `Suspected Deaths` = "Suspected Deaths",
+    `CFR` = "CFR"
+  )
+
+days_num_valid <- pub_table$`Days: Index → Reactive Vaccination`
+days_num_valid <- days_num_valid[!is.na(days_num_valid)]
+
+footer_txt <- sprintf(
+  "Days: mean = %.1f; median = %.1f; mode = %s; IQR = %.1f–%.1f; range = %.1f–%.1f; n = %d complete outbreaks",
+  mean(days_num_valid),
+  median(days_num_valid),
+  names(sort(table(days_num_valid), decreasing = TRUE))[1],
+  quantile(days_num_valid, 0.25),
+  quantile(days_num_valid, 0.75),
+  min(days_num_valid),
+  max(days_num_valid),
+  length(days_num_valid)
+)
+
+ft_pub <- ft_pub %>%
+  add_footer_lines(values = footer_txt) %>%
+  align(align = "left", part = "footer")
+
+# Save outputs
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+png_file <- file.path(out_dir, "table_S3.png")
+docx_file <- file.path(out_dir, "table_S3.docx")
+
+try(save_as_image(ft_pub, path = png_file, expand = 8, zoom = 2), silent = TRUE)
+try(save_as_docx(ft_pub, path = docx_file), silent = TRUE)
+
+ft_pub
+
+
+```
+
+
 ## wilcoxon test
 ```{r}
 coin::wilcox_test(data = ttv_df, all.index.to.effvac.days ~ as.factor(pre.2016.outbreak), distribution = "exact") # use this for ties
@@ -490,11 +563,40 @@ mort_df %>%
 mort_df %>%
   summarise(CFR = sum(tot.deaths.confirmed)/sum(tot.cases.confirmed) * 100, n = n())
 ```
+
+
+## variance and SE calculation for CFR for suspected cases (including confirmed and probable
 ```{r}
 row_count = nrow(mort_df)
 
 var_ratio_by_period <- mort_df %>%
-  filter(!is.na(tot.deaths.confirmed), !is.na(tot.deaths.confirmed)) %>%
+  filter(!is.na(tot.deaths.sus), !is.na(tot.cases.sus)) %>%
+  summarise(
+    n = n(),
+    Xbar = mean(tot.deaths.sus),
+
+    r_hat = sum(tot.deaths.sus) / sum(tot.cases.sus),
+
+    s2_X = var(tot.cases.sus),
+    s2_Y = var(tot.deaths.sus),
+    s_XY = cov(tot.deaths.sus, tot.cases.sus),
+
+    var_ratio = (1 / (n * Xbar^2)) *
+      (r_hat^2 * s2_X + s2_Y - 2 * r_hat * s_XY),
+
+    se_ratio = sqrt(var_ratio),
+  )
+var_ratio_by_period
+```
+
+
+
+## variance and SE calculation for CFR confirmed cases
+```{r}
+row_count = nrow(mort_df)
+
+var_ratio_by_period <- mort_df %>%
+  filter(!is.na(tot.cases.confirmed), !is.na(tot.deaths.confirmed)) %>%
   summarise(
     n = n(),
     Xbar = mean(tot.deaths.confirmed),
@@ -514,7 +616,8 @@ var_ratio_by_period
 ```
 
 
-## variance and SE calculation for CFR
+
+## variance and SE calculation for CFR confirmed cases stratified by period
 ```{r}
 row_count = nrow(mort_df)
 
@@ -664,7 +767,7 @@ Theme_new <- function(base_size = 12, base_family = "sans") {
 }
 ```
 
-
+# Figure 
 # Figure 2 
 ```{r}
 ggplot(data = mort_df, 

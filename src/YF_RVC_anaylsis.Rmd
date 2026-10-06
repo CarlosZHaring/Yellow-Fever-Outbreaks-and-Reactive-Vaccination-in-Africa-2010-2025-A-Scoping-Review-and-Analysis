@@ -279,8 +279,8 @@ ft_pub <- flextable(pub_table) %>%
     `Vaccination rate`  = "Vaccination rate (% per day)"
   )
 
-png_file <- file.path(out_dir, "table_2S.png")
-docx_file <- file.path(out_dir, "table_2S.docx")
+png_file <- file.path(out_dir, "table_S4.png")
+docx_file <- file.path(out_dir, "table_S4.docx")
 
 save_as_image(ft_pub, path = png_file, expand = 8, zoom = 2)
 save_as_docx(ft_pub, path = docx_file)
