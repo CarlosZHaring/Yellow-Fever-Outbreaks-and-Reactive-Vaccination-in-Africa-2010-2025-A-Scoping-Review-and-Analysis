@@ -600,7 +600,7 @@ var_ratio_by_period <- mort_df %>%
          !is.na(tot.deaths.confirmed), !is.na(tot.deaths.prob)) %>%
   summarise(
     n = n(),
-    Xbar = mean(tot.deaths.sus),
+    Xbar = mean(tot.cases.confirmed + tot.cases.prob),
 
     r_hat = (sum(tot.deaths.confirmed) + sum(tot.deaths.prob)) / (sum(tot.cases.prob) + sum(tot.cases.confirmed)),
 
@@ -619,8 +619,6 @@ var_ratio_by_period
 
 ## variance and SE calculation for CFR confirmed cases
 ```{r}
-row_count = nrow(mort_df)
-
 var_ratio_by_period <- mort_df %>%
   filter(!is.na(tot.cases.confirmed), !is.na(tot.deaths.confirmed)) %>%
   summarise(
@@ -716,10 +714,10 @@ mort_df %>%
 upper_bound=quantile(tot.cases.confirmed, .75),
 median = median(tot.cases.confirmed))
 ```
-## wilcoxon of median reported cases
+
+## wilcoxon test
 ```{r}
-wilcox_test(tot.cases.confirmed ~ as.factor(pre.2016.outbreak), data = mort_df,
-            distribution = "exact")
+coin::wilcox_test(data = mort_df, tot.cases.confirmed ~ as.factor(pre.2016.outbreak), distribution = "exact") # use this for ties
 ```
 
 
@@ -828,7 +826,7 @@ geom_segment(
            y = .12) +
 
       annotate("label",
-           label = "pooled CFR, 2017-2025: 26.0%",
+           label = "pooled CFR, 2017-2025: 25.7%",
            x = as.Date("2020-01-05"),
            y = .125,
           ) +
