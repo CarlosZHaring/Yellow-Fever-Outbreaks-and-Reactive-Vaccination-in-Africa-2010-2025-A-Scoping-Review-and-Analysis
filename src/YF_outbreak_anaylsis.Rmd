@@ -565,7 +565,7 @@ mort_df %>%
 ```
 
 
-## variance and SE calculation for CFR for suspected cases (including confirmed and probable
+## variance and SE calculation for CFR for suspected cases (including confirmed and probable)
 ```{r}
 row_count = nrow(mort_df)
 
@@ -589,6 +589,32 @@ var_ratio_by_period <- mort_df %>%
 var_ratio_by_period
 ```
 
+
+
+## variance and SE calculation for CFR for just confirmed and probable
+```{r}
+row_count = nrow(mort_df)
+
+var_ratio_by_period <- mort_df %>%
+  filter(!is.na(tot.cases.confirmed), !is.na(tot.cases.prob),
+         !is.na(tot.deaths.confirmed), !is.na(tot.deaths.prob)) %>%
+  summarise(
+    n = n(),
+    Xbar = mean(tot.deaths.sus),
+
+    r_hat = (sum(tot.deaths.confirmed) + sum(tot.deaths.prob)) / (sum(tot.cases.prob) + sum(tot.cases.confirmed)),
+
+    s2_X = var(tot.cases.confirmed + tot.cases.prob),
+    s2_Y = var(tot.deaths.confirmed + tot.deaths.prob),
+    s_XY = cov(tot.cases.confirmed + tot.cases.prob, tot.deaths.confirmed + tot.deaths.prob),
+
+    var_ratio = (1 / (n * Xbar^2)) *
+      (r_hat^2 * s2_X + s2_Y - 2 * r_hat * s_XY),
+
+    se_ratio = sqrt(var_ratio),
+  )
+var_ratio_by_period
+```
 
 
 ## variance and SE calculation for CFR confirmed cases
@@ -619,7 +645,7 @@ var_ratio_by_period
 
 ## variance and SE calculation for CFR confirmed cases stratified by period
 ```{r}
-row_count = nrow(mort_df)
+
 
 var_ratio_by_period <- mort_df %>%
   filter(!is.na(tot.cases.confirmed), !is.na(tot.deaths.confirmed)) %>%
