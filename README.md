@@ -37,7 +37,7 @@ table_1
 
 table_S3
 - Yellow fever outbreaks in Africa (2010-2025) included in RVC analysis
-- differs from table_1 since it contains suspected case information, suspected death information, and CFR data. 
+- differs from table_1 since it uses most expansive available case information, death information, and CFR data. 
 
 table_S4
 - Yellow fever reactive vaccination campaigns in Africa (2010-2025) included in the analysis
